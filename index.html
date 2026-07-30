@@ -1,0 +1,3004 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>SARUX · Calculadora de Producción</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0a0c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SARUX Calc">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --black:#0a0a0c;
+    --panel:#141417;
+    --panel-2:#1b1b1f;
+    --line: rgba(255,255,255,0.08);
+    --red:#c81e3a;
+    --red-bright:#e8304f;
+    --text:#f2f0ee;
+    --text-dim:#9a9a9f;
+    --ok:#2fbf71;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 600px at 85% -10%, rgba(200,30,58,0.14), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(200,30,58,0.10), transparent 60%),
+      var(--black);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:36px 20px 80px;}
+  header{margin-bottom:28px;}
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--red-bright);margin-bottom:10px;
+  }
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:clamp(28px,4vw,40px);
+    margin:0 0 6px;
+    letter-spacing:-.01em;
+  }
+  header p{color:var(--text-dim);margin:0;font-size:15px;}
+
+  .tabs{display:flex;gap:8px;margin:28px 0 22px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  .tab{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:15px;font-weight:600;
+    padding:12px 18px;cursor:pointer;color:var(--text-dim);
+    border:none;background:none;position:relative;
+    display:flex;align-items:center;gap:8px;
+  }
+  .tab .n{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--red-bright);}
+  .tab.active{color:var(--text);}
+  .tab.active::after{
+    content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;
+    background:var(--red-bright);
+  }
+
+  .panel{display:none;}
+  .panel.active{display:block;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  @media(max-width:820px){.grid{grid-template-columns:1fr;}}
+
+  .card{
+    background:linear-gradient(180deg,var(--panel),var(--panel-2));
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px 22px;
+    margin-bottom:20px;
+  }
+  .card h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:16px;margin:0 0 4px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .card h2 .dot{width:6px;height:6px;border-radius:50%;background:var(--red-bright);}
+  .card .sub{color:var(--text-dim);font-size:13px;margin:0 0 16px;}
+
+  label{
+    display:block;font-size:12px;color:var(--text-dim);
+    margin-bottom:5px;font-family:'JetBrains Mono',monospace;letter-spacing:.02em;
+  }
+  .field{margin-bottom:14px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+
+  input[type=number], input[type=text]{
+    width:100%;background:#0d0d10;border:1px solid var(--line);
+    color:var(--text);border-radius:8px;padding:10px 12px;
+    font-family:'JetBrains Mono',monospace;font-size:14px;
+    transition:border-color .15s;
+  }
+  input:focus{outline:none;border-color:var(--red-bright);}
+  select{
+    width:100%;background:#0d0d10;border:1px solid var(--line);color:var(--text);
+    border-radius:8px;padding:10px 12px;font-family:'Inter',sans-serif;font-size:14px;
+  }
+  .check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim);margin-bottom:14px;}
+  .check input{width:auto;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{
+    text-align:left;font-family:'JetBrains Mono',monospace;font-weight:500;
+    color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+    padding:6px 8px;border-bottom:1px solid var(--line);
+  }
+  td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.04);}
+  td input{padding:7px 8px;font-size:13px;}
+  .icon-btn{
+    background:none;border:1px solid var(--line);color:var(--text-dim);
+    width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:15px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .icon-btn:hover{border-color:var(--red-bright);color:var(--red-bright);}
+
+  .btn{
+    font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;
+    background:var(--red-bright);color:#fff;border:none;border-radius:9px;
+    padding:11px 18px;cursor:pointer;transition:transform .1s, box-shadow .15s;
+  }
+  .btn:hover{box-shadow:0 6px 18px rgba(232,48,79,0.35);transform:translateY(-1px);}
+  .btn.ghost{
+    background:none;border:1px solid var(--line);color:var(--text);
+  }
+  .btn.ghost:hover{border-color:var(--red-bright);color:var(--red-bright);box-shadow:none;transform:none;}
+  .btn.small{padding:7px 12px;font-size:12px;}
+
+  .actions{display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap;}
+
+  .results{
+    background:linear-gradient(180deg,rgba(200,30,58,0.10),rgba(200,30,58,0.02));
+    border:1px solid rgba(200,30,58,0.3);
+    border-radius:14px;padding:20px 22px;margin-top:20px;
+  }
+  .results h2{color:var(--text);}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin:14px 0;}
+  .stat{background:rgba(0,0,0,0.25);border:1px solid var(--line);border-radius:10px;padding:12px 14px;}
+  .stat .label{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;}
+  .stat .val{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin-top:4px;}
+  .stat .val.accent{color:var(--red-bright);}
+  .stat .val.ok{color:var(--ok);}
+
+  .canvas-wrap{
+    background:#0d0d10;border:1px solid var(--line);border-radius:12px;
+    padding:16px;margin-top:16px;overflow-x:auto;
+  }
+  .canvas-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .canvas-head span{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);}
+  canvas{display:block;background:#151519;border-radius:6px;max-width:100%;}
+  .sheet-nav{display:flex;gap:8px;align-items:center;}
+  .sheet-nav span{font-size:12px;color:var(--text);}
+
+  .empty{color:var(--text-dim);font-size:13px;padding:10px 0;}
+  .suggest-box{margin-top:6px;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .suggest-box:empty{display:none;border:none;}
+  .suggest-item{padding:8px 10px;font-size:12.5px;color:var(--text);background:#0d0d10;border-bottom:1px solid rgba(255,255,255,0.05);}
+  .suggest-item:last-child{border-bottom:none;}
+  .suggest-item.muted{color:var(--text-dim);font-style:italic;}
+  .note-line{color:var(--text-dim);font-size:12px;margin-top:10px;line-height:1.5;}
+  .warn{
+    background:rgba(200,30,58,0.12);border:1px solid rgba(200,30,58,0.4);
+    color:#ffb4c0;border-radius:8px;padding:10px 12px;font-size:13px;margin-top:12px;
+  }
+  /* Modo consulta: se ve todo, no se puede editar. Se activa por default; se desbloquea con contraseña. */
+  body.view-only input,
+  body.view-only select,
+  body.view-only textarea{
+    pointer-events:none !important;
+    opacity:0.7;
+  }
+  body.view-only button.btn,
+  body.view-only button.btn.ghost,
+  body.view-only .icon-btn{
+    pointer-events:none !important;
+    opacity:0.35;
+  }
+  #edit-lock-btn{
+    position:fixed; top:12px; right:12px; z-index:999;
+    background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    border-radius:20px; padding:8px 14px; font-size:12px; font-weight:600;
+    cursor:pointer; pointer-events:auto !important; opacity:1 !important;
+  }
+  #cloud-status{
+    position:fixed; top:12px; left:12px; z-index:999;
+    background:var(--panel-2); border:1px solid var(--line); color:var(--text-dim);
+    border-radius:20px; padding:8px 14px; font-size:11px; pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<button id="edit-lock-btn" onclick="toggleEditLock()">🔒 Solo consulta</button>
+<div id="cloud-status">☁️ conectando…</div>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">SARUX · Herramientas de producción</div>
+    <h1>Calculadora de Producción</h1>
+    <p>Calcula piezas por metro de DTF y diseños por hoja A4 de sticker, con tus propios precios de proveedor.</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab" data-tab="costos"><span class="n">00</span> Costos compartidos</button>
+    <button class="tab active" data-tab="dtf"><span class="n">01</span> DTF Textil / UV</button>
+    <button class="tab" data-tab="a4"><span class="n">02</span> Hojas Sticker A4</button>
+    <button class="tab" data-tab="almohadas"><span class="n">03</span> Almohadas</button>
+    <button class="tab" data-tab="mug"><span class="n">04</span> Tazas / Mugs</button>
+    <button class="tab" data-tab="termo"><span class="n">05</span> Termos / Tumblers</button>
+    <button class="tab" data-tab="playera"><span class="n">06</span> Playeras</button>
+    <button class="tab" data-tab="gorra"><span class="n">07</span> Gorras</button>
+    <button class="tab" data-tab="puzzle"><span class="n">08</span> Rompecabezas</button>
+    <button class="tab" data-tab="otros"><span class="n">09</span> Otros sublimables</button>
+    <button class="tab" data-tab="ropadtf"><span class="n">09b</span> Playera/Sudadera DTF</button>
+    <button class="tab" data-tab="lista"><span class="n">10</span> Lista de precios</button>
+    <button class="tab" data-tab="cotizacion"><span class="n">11</span> Cotización</button>
+  </div>
+
+  <!-- ===================== COSTOS COMPARTIDOS ===================== -->
+  <div class="panel" id="panel-costos">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2><span class="dot"></span>Costos operativos</h2>
+          <p class="sub">Estos valores alimentan las calculadoras de Tazas, Termos, Playeras, Gorras y Rompecabezas, para no capturarlos cada vez.</p>
+          <div class="field"><label>Luz — costo por hora de prensa ($)</label><input type="number" id="shared-luz" value="9" step="0.5" oninput="saveSharedSettings()"></div>
+          <div class="field"><label>Mano de obra — costo por hora ($)</label><input type="number" id="shared-labor" value="60" step="1" oninput="saveSharedSettings()"></div>
+          <div class="field"><label>Costo de hoja de impresión completa ($)</label><input type="number" id="shared-ink" value="12" step="0.5" oninput="saveSharedSettings()"></div>
+          <p class="note-line">Este es el costo de imprimir 1 hoja completa (papel + tinta). Cada producto divide este costo entre cuántos diseños caben en la hoja para sacar el costo de impresión por pieza.</p>
+          <div class="field" style="margin-top:14px;"><label>Embalaje — solo menudeo ($)</label><input type="number" id="shared-embalaje" value="7" step="0.5" oninput="saveSharedSettings()"></div>
+          <div class="field"><label>Pasajes/camión — solo menudeo ($)</label><input type="number" id="shared-pasajes" value="16" step="0.5" oninput="saveSharedSettings()"></div>
+          <p class="note-line">Estos dos solo se suman al costo y al precio cuando vendes pieza suelta. En mayoreo no se cobran — por eso el precio de mayoreo puede verse mucho más bajo que el de pieza, y está bien que así sea.</p>
+          <div class="field" style="margin-top:14px;"><label>Redondear precios de venta</label>
+            <select id="shared-round" onchange="saveSharedSettings()">
+              <option value="none">Sin redondeo</option>
+              <option value="1">Al peso más cercano ($1)</option>
+              <option value="5">A $5 más cercano</option>
+              <option value="10">A $10 más cercano</option>
+              <option value="90">Terminación .90</option>
+              <option value="99" selected>Terminación .99</option>
+            </select>
+          </div>
+          <p class="note-line">Aplica solo a precios de venta (por pieza y mayoreo), nunca a los costos.</p>
+          <div class="check" style="margin-top:14px;"><input type="checkbox" id="shared-iva-on" onchange="saveSharedSettings()"><label style="margin:0;font-family:'Inter',sans-serif;color:var(--text);font-size:13px;">Agregar IVA a los precios de venta</label></div>
+          <div class="field"><label>IVA (%)</label><input type="number" id="shared-iva-pct" value="16" step="0.5" oninput="saveSharedSettings()"></div>
+          <p class="note-line">La lista de tu proveedor dice "precios más IVA" — si activas esto, tus precios de venta (no los costos) ya incluyen el IVA que definas aquí.</p>
+          <p class="note-line" id="shared-save-status" style="color:var(--ok);"></p>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h2><span class="dot"></span>Cómo se usa</h2>
+          <p class="sub" style="margin-bottom:0;">Tazas, Termos, Playeras, Gorras y Rompecabezas toman estos tres valores automáticamente al calcular. Si cambias algo aquí, solo tienes que volver a pulsar <strong>Calcular</strong> en la pestaña del producto para que se actualice. DTF, Hojas A4 y Almohadas siguen usando sus propios costos, como ya los tenías.</p>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Respaldo de tus datos</h2>
+          <p class="sub">Los productos que agregaste, tus tablas de descuento y tus cotizaciones guardadas viven en este navegador. Si cambias de celular o borras el caché, se pierden — descarga un respaldo de vez en cuando.</p>
+          <div class="actions" style="margin-bottom:14px;">
+            <button class="btn ghost small" onclick="exportBackup()">⬇ Descargar respaldo</button>
+          </div>
+          <div class="field"><label>Restaurar desde un respaldo</label><input type="file" id="backup-file-input" accept="application/json" onchange="importBackupFile(event)"></div>
+          <p class="note-line" id="backup-status"></p>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Logo para tus cotizaciones</h2>
+          <p class="sub">Sube tu logo para que aparezca en la imagen de la cotización en vez de solo el texto "SARUX".</p>
+          <div class="field"><input type="file" id="logo-file-input" accept="image/*" onchange="uploadLogo(event)"></div>
+          <p class="note-line" id="logo-status"></p>
+          <div id="logo-preview" style="margin-top:8px;"></div>
+          <div class="actions" id="logo-remove-wrap" style="display:none;"><button class="btn ghost small" onclick="removeLogo()">Quitar logo</button></div>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Contacto en tus cotizaciones</h2>
+          <p class="sub">Este teléfono/WhatsApp aparece impreso en la imagen de la cotización, para que quien la reciba (aunque se la reenvíen) sepa cómo contactarte.</p>
+          <div class="field"><label>Teléfono / WhatsApp</label><input type="text" id="cot-phone-input" placeholder="Ej. WhatsApp 222 123 4567" oninput="saveCotPhone()"></div>
+          <p class="note-line" id="cot-phone-status"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot"></span>Descuentos por volumen (mayoreo)</h2>
+      <p class="sub">Aquí editas, en un solo lugar, a partir de cuántas piezas le bajas el % de precio al cliente por cada categoría. Cambiarlo aquí actualiza también la pestaña de ese producto.</p>
+      <div class="grid" id="central-tiers-grid"></div>
+    </div>
+  </div>
+
+  <!-- ===================== DTF PANEL ===================== -->
+  <div class="panel active" id="panel-dtf">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2><span class="dot"></span>Diseño y rollo</h2>
+          <p class="sub">Medidas en centímetros.</p>
+          <div class="row2">
+            <div class="field"><label>Ancho del diseño</label><input type="number" id="dtf-w" value="10" step="0.1"></div>
+            <div class="field"><label>Alto del diseño</label><input type="number" id="dtf-h" value="10" step="0.1"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>Ancho del rollo DTF</label>
+              <select id="dtf-roll">
+                <option value="30">30 cm</option>
+                <option value="38">38 cm</option>
+                <option value="58" selected>58 cm</option>
+                <option value="60">60 cm</option>
+              </select>
+            </div>
+            <div class="field"><label>Separación entre diseños</label><input type="number" id="dtf-gap" value="0.5" step="0.1"></div>
+          </div>
+          <div class="field"><label>Cantidad de piezas a producir</label><input type="number" id="dtf-qty" value="50" step="1"></div>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Tabla de precios del proveedor</h2>
+          <p class="sub">Precio por metro lineal según volumen (de menor a mayor).</p>
+          <table id="dtf-table">
+            <thead><tr><th>Desde (m)</th><th>Precio / m</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div class="actions">
+            <button class="btn ghost small" onclick="addRow('dtf')">+ Agregar rango</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Margen de ganancia</h2>
+          <div class="field"><label>Margen deseado (%)</label><input type="number" id="dtf-margin" value="40" step="1"></div>
+          <div class="actions">
+            <button class="btn" onclick="calcDTF()">Calcular</button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="results" id="dtf-results" style="display:none;">
+          <h2><span class="dot" style="background:var(--ok)"></span>Resultado</h2>
+          <div class="stat-grid" id="dtf-stats"></div>
+          <div class="canvas-wrap">
+            <div class="canvas-head"><span>Vista previa del film</span><span id="dtf-canvas-label"></span></div>
+            <canvas id="dtf-canvas" width="560" height="420"></canvas>
+          </div>
+          <div id="dtf-warn"></div>
+        </div>
+        <div class="empty" id="dtf-empty">Completa los datos y pulsa <strong>Calcular</strong> para ver el resultado.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== A4 PANEL ===================== -->
+  <div class="panel" id="panel-a4">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2><span class="dot"></span>Diseños a imprimir</h2>
+          <p class="sub">Agrega una o varias formas — la rejilla las acomoda juntas por hoja para aprovechar el espacio.</p>
+          <table id="a4-designs">
+            <thead><tr><th>Diseño</th><th>Ancho</th><th>Alto</th><th>Cant.</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div class="actions">
+            <button class="btn ghost small" onclick="addDesignRow()">+ Agregar diseño</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Hoja A4</h2>
+          <div class="row2">
+            <div class="field"><label>Margen del borde (cm)</label><input type="number" id="a4-margin-edge" value="0.5" step="0.1"></div>
+            <div class="field"><label>Separación entre diseños (cm)</label><input type="number" id="a4-gap" value="0.3" step="0.1"></div>
+          </div>
+          <div class="check"><input type="checkbox" id="a4-rotate" checked><label style="margin:0;font-family:'Inter',sans-serif;color:var(--text);font-size:13px;">Permitir rotar diseños 90° para aprovechar mejor la hoja</label></div>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Tabla de precios del proveedor</h2>
+          <p class="sub">Precio por hoja A4 según volumen. Ya está con tu costo real de vinil ($120 ÷ 50 hojas = $2.40/hoja) — edítalo si compras en otro proveedor o cambia el precio.</p>
+          <table id="a4-table">
+            <thead><tr><th>Desde (hojas)</th><th>Precio / hoja</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div class="actions">
+            <button class="btn ghost small" onclick="addRow('a4')">+ Agregar rango</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Tinta y corte por hoja</h2>
+          <p class="sub">Se suma al costo de cada hoja completa, junto con el vinil. Usa tu costo real de mano de obra que ya configuraste en "00 · Costos compartidos".</p>
+          <div class="row2">
+            <div class="field"><label>Tinta por hoja completa ($)</label><input type="number" id="a4-ink" value="1" step="0.25"></div>
+            <div class="field"><label>Tiempo de corte por hoja (min)</label><input type="number" id="a4-cut-time" value="1.5" step="0.5"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Margen de ganancia</h2>
+          <div class="field"><label>Margen deseado (%)</label><input type="number" id="a4-margin" value="40" step="1"></div>
+          <div class="actions">
+            <button class="btn" onclick="calcA4()">Calcular</button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="results" id="a4-results" style="display:none;">
+          <h2><span class="dot" style="background:var(--ok)"></span>Resultado</h2>
+          <div class="stat-grid" id="a4-stats"></div>
+          <div class="canvas-wrap">
+            <div class="canvas-head">
+              <span>Vista previa de hoja</span>
+              <div class="sheet-nav">
+                <button class="icon-btn" onclick="shiftSheet(-1)">‹</button>
+                <span id="a4-sheet-label">1 / 1</span>
+                <button class="icon-btn" onclick="shiftSheet(1)">›</button>
+              </div>
+            </div>
+            <canvas id="a4-canvas" width="420" height="594"></canvas>
+          </div>
+          <div id="a4-warn"></div>
+        </div>
+        <div class="empty" id="a4-empty">Agrega tus diseños y pulsa <strong>Calcular</strong> para ver cuántas hojas necesitas — ya viene precargado con las 3 etiquetas de un Kit School (edítalas o bórralas si no aplican).</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== ALMOHADAS PANEL (embebido tal cual) ===================== -->
+  <div class="panel" id="panel-almohadas">
+    <iframe id="almohadas-frame" style="width:100%;min-height:1400px;border:0;border-radius:14px;background:#FAF6F0;" title="Calculadora de Almohadas"></iframe>
+  </div>
+
+  <!-- ===================== PRODUCTOS DE SUBLIMACION (generados por JS) ===================== -->
+  <div class="panel" id="panel-mug"></div>
+  <div class="panel" id="panel-termo"></div>
+  <div class="panel" id="panel-playera"></div>
+  <div class="panel" id="panel-gorra"></div>
+  <div class="panel" id="panel-puzzle"></div>
+  <div class="panel" id="panel-otros"></div>
+  <div class="panel" id="panel-ropadtf"></div>
+  <div class="panel" id="panel-lista"></div>
+  <div class="panel" id="panel-cotizacion"></div>
+</div>
+
+<script>
+/* ============================================================
+   SINCRONIZACIÓN EN LA NUBE (Supabase)
+   ============================================================
+   Todo lo que esta calculadora ya guardaba en el celular (localStorage)
+   ahora también se guarda en una base de datos compartida en internet.
+   Así tú y tu novia ven lo mismo, en cualquier celular donde abran el link.
+
+   Si no hay internet en ese momento, la app sigue funcionando normal con
+   lo último que quedó guardado en ESE celular — no se traba ni se rompe.
+   ------------------------------------------------------------ */
+const SUPABASE_URL = 'https://zjvpaybommbkudhftmse.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpqdnBheWJvbW1ia3VkaGZ0bXNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUzODQyMDAsImV4cCI6MjEwMDk2MDIwMH0.REgR35gVx4ev1A7S0C-axN4ESMgi4m5DIA5zdwM-eWU';
+
+let sbClient = null;
+try{
+  sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}catch(e){ console.error('No se pudo iniciar la conexión con Supabase', e); }
+
+const _origSetItem = Storage.prototype.setItem.bind(localStorage);
+const _origGetItem = Storage.prototype.getItem.bind(localStorage);
+
+/* localStorage guarda siempre texto. Para mandarlo a una columna jsonb de Supabase,
+   intentamos interpretarlo como JSON (que es como esta app casi siempre lo guarda);
+   si no lo es (por ejemplo un número de teléfono suelto), lo mandamos como texto plano. */
+function cloudEncode(rawValue){
+  try{ return { isJson:true, v: JSON.parse(rawValue) }; }
+  catch(e){ return { isJson:false, v: rawValue }; }
+}
+function cloudDecode(payload){
+  if(payload == null) return null;
+  return payload.isJson ? JSON.stringify(payload.v) : payload.v;
+}
+
+/* A partir de ahora, CADA vez que cualquier parte de la app guarde algo con
+   localStorage.setItem(...) — cosa que ya hacía desde antes — también se sube
+   a Supabase. No hizo falta tocar ninguna función de guardado existente. */
+localStorage.setItem = function(key, rawValue){
+  _origSetItem(key, rawValue);
+  if(!sbClient) return;
+  sbClient.from('app_data')
+    .upsert({ key, value: cloudEncode(rawValue), updated_at: new Date().toISOString() })
+    .then(({error})=>{
+      if(error){ setCloudStatus('⚠️ No se pudo guardar en la nube', true); }
+      else { setCloudStatus('☁️ Sincronizado ✓'); }
+    })
+    .catch(()=> setCloudStatus('⚠️ Sin conexión — guardado solo en este celular', true));
+};
+
+function setCloudStatus(text, isWarn){
+  const el = document.getElementById('cloud-status');
+  if(!el) return;
+  el.textContent = text;
+  el.style.color = isWarn ? '#ffb4c0' : '';
+  el.style.borderColor = isWarn ? 'rgba(200,30,58,0.4)' : '';
+}
+
+/* Antes de que el resto de la app arranque, traemos lo último guardado en la nube
+   y lo dejamos en este celular. Se hace de forma síncrona a propósito (una sola vez,
+   al abrir la app) para no tener que recargar la página ni mostrar la app "vacía"
+   por un instante mientras carga. */
+(function pullCloudDataOnStartup(){
+  if(!sbClient) return;
+  try{
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', SUPABASE_URL + '/rest/v1/app_data?select=key,value', false);
+    xhr.setRequestHeader('apikey', SUPABASE_ANON_KEY);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + SUPABASE_ANON_KEY);
+    xhr.send(null);
+    if(xhr.status >= 200 && xhr.status < 300){
+      const rows = JSON.parse(xhr.responseText);
+      rows.forEach(row=>{
+        const decoded = cloudDecode(row.value);
+        if(decoded != null) _origSetItem(row.key, decoded);
+      });
+    }
+  }catch(e){ console.error('No se pudo traer la información guardada en la nube (¿sin internet?)', e); }
+})();
+
+/* Mientras la app está abierta, si tú o tu novia guardan algo desde otro celular,
+   este se entera solo y se refresca para mostrarlo — sin tener que hacer nada.
+   IMPORTANTE: esto solo aplica en modo "solo consulta". Si tú (el editor) tienes el
+   modo edición desbloqueado, la app NO se recarga sola — si no, cada tecla que
+   escribes se sube a la nube, te rebota de regreso, y la app se recargaría todo
+   el tiempo mientras escribes (eso causaba el salto raro a la pestaña de DTF). */
+if(sbClient){
+  window.addEventListener('load', ()=>{
+    setCloudStatus('☁️ Conectado — datos compartidos');
+    sbClient.channel('app_data_live')
+      .on('postgres_changes', { event:'*', schema:'public', table:'app_data' }, (payload)=>{
+        if(isEditUnlocked()) return; // el editor no se auto-recarga mientras trabaja
+        const row = payload.new;
+        if(!row) return;
+        const decoded = cloudDecode(row.value);
+        if(decoded == null) return;
+        if(_origGetItem(row.key) === decoded) return; // ya lo teníamos, no hace nada
+        _origSetItem(row.key, decoded);
+        setCloudStatus('☁️ Nuevos cambios recibidos — actualizando…');
+        clearTimeout(window.__cloudRefreshTimer);
+        window.__cloudRefreshTimer = setTimeout(()=>{ location.reload(); }, 1500);
+      })
+      .subscribe();
+  });
+}
+
+/* ============================================================
+   MODO EDICIÓN (para que tu novia solo consulte)
+   ------------------------------------------------------------
+   Por default, la app abre en "solo consulta": se ve todo pero no se puede
+   tocar nada. Tú desbloqueas con una contraseña, una sola vez por celular
+   (se queda desbloqueado en ese celular hasta que le des "Bloquear" a mano).
+   Cámbiala por la tuya aquí abajo si quieres: */
+const EDIT_PASSWORD = 'sarux2026';
+
+function isEditUnlocked(){ return _origGetItem('sarux_edit_unlocked') === '1'; }
+
+function toggleEditLock(){
+  if(isEditUnlocked()){
+    _origSetItem('sarux_edit_unlocked', '0');
+    applyEditLockUI();
+    return;
+  }
+  const pass = prompt('Contraseña para activar modo edición:');
+  if(pass === null) return;
+  if(pass === EDIT_PASSWORD){
+    _origSetItem('sarux_edit_unlocked', '1');
+    applyEditLockUI();
+  } else {
+    alert('Contraseña incorrecta — se queda en modo solo consulta.');
+  }
+}
+
+function applyEditLockUI(){
+  const unlocked = isEditUnlocked();
+  document.body.classList.toggle('view-only', !unlocked);
+  const btn = document.getElementById('edit-lock-btn');
+  if(btn) btn.textContent = unlocked ? '🔓 Modo edición' : '🔒 Solo consulta';
+}
+window.addEventListener('load', applyEditLockUI);
+
+/* ---------- Tabs ---------- */
+function activateTab(tabName){
+  const btn = document.querySelector('.tab[data-tab="'+tabName+'"]');
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const panel = document.getElementById('panel-'+tabName);
+  if(panel) panel.classList.add('active');
+}
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{ activateTab(t.dataset.tab); });
+});
+
+/* ---------- Price tier tables (shared logic for DTF + A4) ---------- */
+const tierData = {
+  dtf: [{from:1, price:120},{from:5, price:100},{from:10, price:85}],
+  a4:  [{from:1, price:2.4}]
+};
+
+function renderTable(key){
+  const tbody = document.querySelector('#'+key+'-table tbody');
+  tbody.innerHTML='';
+  tierData[key].forEach((row,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td><input type="number" step="0.1" value="${row.from}" onchange="tierData['${key}'][${i}].from=parseFloat(this.value)||0"></td>
+      <td><input type="number" step="0.01" value="${row.price}" onchange="tierData['${key}'][${i}].price=parseFloat(this.value)||0"></td>
+      <td><button class="icon-btn" onclick="removeRow('${key}',${i})">×</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+function addRow(key){
+  tierData[key].push({from:0, price:0});
+  renderTable(key);
+}
+function removeRow(key,i){
+  tierData[key].splice(i,1);
+  renderTable(key);
+}
+function priceForTier(key, volume){
+  const sorted=[...tierData[key]].sort((a,b)=>a.from-b.from);
+  let price = sorted.length? sorted[0].price : 0;
+  for(const t of sorted){ if(volume >= t.from) price = t.price; }
+  return price;
+}
+renderTable('dtf');
+renderTable('a4');
+
+/* ---------- A4 design rows ---------- */
+let designId=0;
+function addDesignRow(name,w,h,qty){
+  designId++;
+  const tbody=document.querySelector('#a4-designs tbody');
+  const tr=document.createElement('tr');
+  tr.dataset.id=designId;
+  tr.innerHTML=`
+    <td><input type="text" value="${name||('Diseño '+designId)}" style="width:110px"></td>
+    <td><input type="number" step="0.1" value="${w||5}" style="width:65px"></td>
+    <td><input type="number" step="0.1" value="${h||5}" style="width:65px"></td>
+    <td><input type="number" step="1" value="${qty||10}" style="width:55px"></td>
+    <td><button class="icon-btn" onclick="this.closest('tr').remove()">×</button></td>`;
+  tbody.appendChild(tr);
+}
+addDesignRow('Lápices/colores', 4.5, 1.2, 50);
+addDesignRow('Circular multiusos', 4, 4, 20);
+addDesignRow('Libros/cuadernos', 8, 4, 10);
+
+/* ---------- DTF calculation ---------- */
+function calcDTF(){
+  const dw=parseFloat(document.getElementById('dtf-w').value)||0;
+  const dh=parseFloat(document.getElementById('dtf-h').value)||0;
+  const roll=parseFloat(document.getElementById('dtf-roll').value)||58;
+  const gap=parseFloat(document.getElementById('dtf-gap').value)||0;
+  const qty=parseInt(document.getElementById('dtf-qty').value)||0;
+  const margin=parseFloat(document.getElementById('dtf-margin').value)||0;
+
+  if(dw<=0||dh<=0||qty<=0){ alertWarn('dtf-warn','Revisa las medidas y la cantidad.'); return; }
+
+  const perRow = Math.max(1, Math.floor((roll+gap) / (dw+gap)));
+  if((dw) > roll){ alertWarn('dtf-warn','El diseño es más ancho que el rollo seleccionado.'); }
+
+  const rowsNeeded = Math.ceil(qty / perRow);
+  const lengthCm = rowsNeeded * (dh+gap) - gap;
+  const lengthM = Math.max(0, lengthCm/100);
+
+  const pricePerM = priceForTier('dtf', lengthM);
+  const materialCost = pricePerM * lengthM;
+  const costPerUnit = materialCost / qty;
+  const salePrice = costPerUnit / (1 - margin/100);
+  const profitPerUnit = salePrice - costPerUnit;
+
+  document.getElementById('dtf-empty').style.display='none';
+  document.getElementById('dtf-results').style.display='block';
+  document.getElementById('dtf-warn').innerHTML='';
+
+  document.getElementById('dtf-stats').innerHTML = `
+    <div class="stat"><div class="label">Por fila</div><div class="val">${perRow}</div></div>
+    <div class="stat"><div class="label">Metros lineales</div><div class="val accent">${lengthM.toFixed(2)} m</div></div>
+    <div class="stat"><div class="label">Precio / m aplicado</div><div class="val">$${pricePerM.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Costo material total</div><div class="val">$${materialCost.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Costo por pieza</div><div class="val">$${costPerUnit.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Precio sugerido / pieza</div><div class="val ok">$${salePrice.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Ganancia / pieza</div><div class="val ok">$${profitPerUnit.toFixed(2)}</div></div>
+  `;
+
+  document.getElementById('dtf-canvas-label').textContent = `${roll}cm × ${lengthCm.toFixed(1)}cm`;
+  drawDtfCanvas(roll, lengthCm, dw, dh, gap, perRow, qty);
+}
+
+function drawDtfCanvas(roll, lengthCm, dw, dh, gap, perRow, qty){
+  const canvas=document.getElementById('dtf-canvas');
+  const ctx=canvas.getContext('2d');
+  const padding=16;
+  const maxW=canvas.width-padding*2, maxH=canvas.height-padding*2;
+  const scale=Math.min(maxW/roll, maxH/Math.max(lengthCm,1));
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const stripW=roll*scale, stripH=lengthCm*scale;
+  const ox=(canvas.width-stripW)/2, oy=padding;
+
+  ctx.fillStyle='#0a0a0c';
+  ctx.fillRect(ox,oy,stripW,stripH);
+  ctx.strokeStyle='rgba(255,255,255,0.15)';
+  ctx.strokeRect(ox,oy,stripW,stripH);
+
+  let placed=0;
+  let y=0;
+  while(placed<qty){
+    let x=0;
+    for(let c=0;c<perRow && placed<qty;c++){
+      const px=ox + x*scale;
+      const py=oy + y*scale;
+      ctx.fillStyle='rgba(232,48,79,0.35)';
+      ctx.strokeStyle='#e8304f';
+      ctx.lineWidth=1;
+      ctx.fillRect(px,py,dw*scale,dh*scale);
+      ctx.strokeRect(px,py,dw*scale,dh*scale);
+      x += dw+gap;
+      placed++;
+    }
+    y += dh+gap;
+  }
+}
+
+/* ---------- A4 shelf packing ---------- */
+let a4Sheets = [];
+let a4CurrentSheet = 0;
+
+function calcA4(){
+  const marginEdge=parseFloat(document.getElementById('a4-margin-edge').value)||0;
+  const gap=parseFloat(document.getElementById('a4-gap').value)||0;
+  const rotateAllowed=document.getElementById('a4-rotate').checked;
+  const margin=parseFloat(document.getElementById('a4-margin').value)||0;
+
+  const sheetW=21 - marginEdge*2;
+  const sheetH=29.7 - marginEdge*2;
+
+  const rows=[...document.querySelectorAll('#a4-designs tbody tr')];
+  let items=[];
+  let anyInvalid=false;
+  rows.forEach(tr=>{
+    const inputs=tr.querySelectorAll('input');
+    const name=inputs[0].value || 'Diseño';
+    const w=parseFloat(inputs[1].value)||0;
+    const h=parseFloat(inputs[2].value)||0;
+    const qty=parseInt(inputs[3].value)||0;
+    if(w<=0||h<=0||qty<=0){ anyInvalid=true; return; }
+    for(let i=0;i<qty;i++) items.push({name,w,h});
+  });
+
+  if(items.length===0){ alertWarn('a4-warn','Agrega al menos un diseño válido (ancho, alto y cantidad mayores a 0).'); return; }
+
+  // sort largest-first by max dimension for better shelf packing
+  items.sort((a,b)=> Math.max(b.w,b.h)-Math.max(a.w,a.h));
+
+  const sheets=[];
+  let unplaceable=[];
+  let remaining=[...items];
+
+  while(remaining.length>0){
+    const sheet=[]; // placed rects {x,y,w,h,name}
+    let y=0;
+    let progressedAtAll=false;
+    while(y < sheetH && remaining.length>0){
+      let x=0;
+      let shelfHeight=0;
+      let placedOnShelf=false;
+      let i=0;
+      while(i<remaining.length){
+        const it=remaining[i];
+        let orientations=[[it.w,it.h]];
+        if(rotateAllowed) orientations.push([it.h,it.w]);
+        let placed=false;
+        for(const [w,h] of orientations){
+          if(x+w <= sheetW+0.001 && y+h <= sheetH+0.001){
+            sheet.push({x,y,w,h,name:it.name});
+            x += w+gap;
+            shelfHeight=Math.max(shelfHeight,h);
+            remaining.splice(i,1);
+            placed=true;
+            placedOnShelf=true;
+            progressedAtAll=true;
+            break;
+          }
+        }
+        if(!placed) i++;
+      }
+      if(!placedOnShelf) break; // nothing more fits on this shelf/sheet vertically
+      y += shelfHeight+gap;
+    }
+    if(!progressedAtAll){
+      // items left that don't fit at all on an empty sheet -> mark unplaceable, stop to avoid infinite loop
+      unplaceable = remaining;
+      remaining = [];
+      break;
+    }
+    sheets.push(sheet);
+  }
+
+  a4Sheets = sheets;
+  a4CurrentSheet = 0;
+
+  const totalSheets = sheets.length;
+  const totalItems = items.length - unplaceable.length;
+  const perSheetAvg = totalSheets? (totalItems/totalSheets) : 0;
+
+  const pricePerSheet = priceForTier('a4', totalSheets);
+  const inkPerSheet = parseFloat(document.getElementById('a4-ink').value) || 0;
+  const cutTimeMin = parseFloat(document.getElementById('a4-cut-time').value) || 0;
+  const laborHora = parseFloat(document.getElementById('shared-labor').value) || 0;
+  const cutCostPerSheet = (cutTimeMin/60) * laborHora;
+  const costPerSheetTotal = pricePerSheet + inkPerSheet + cutCostPerSheet;
+  const materialCost = costPerSheetTotal * totalSheets;
+  const costPerUnit = totalItems>0 ? materialCost/totalItems : 0;
+  const salePrice = costPerUnit / (1 - margin/100);
+  const profitPerUnit = salePrice - costPerUnit;
+
+  document.getElementById('a4-empty').style.display='none';
+  document.getElementById('a4-results').style.display='block';
+
+  document.getElementById('a4-stats').innerHTML = `
+    <div class="stat"><div class="label">Hojas A4 necesarias</div><div class="val accent">${totalSheets}</div></div>
+    <div class="stat"><div class="label">Diseños por hoja (prom.)</div><div class="val">${perSheetAvg.toFixed(1)}</div></div>
+    <div class="stat"><div class="label">Vinil + tinta + corte / hoja</div><div class="val">$${costPerSheetTotal.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Costo total del pedido</div><div class="val">$${materialCost.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Costo por diseño</div><div class="val">$${costPerUnit.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Precio sugerido / diseño</div><div class="val ok">$${salePrice.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Ganancia / diseño</div><div class="val ok">$${profitPerUnit.toFixed(2)}</div></div>
+  `;
+
+  const warnBox=document.getElementById('a4-warn');
+  warnBox.innerHTML = unplaceable.length
+    ? `<div class="warn">${unplaceable.length} diseño(s) no caben en una hoja A4 con las medidas dadas (revisa el tamaño del diseño vs. la hoja).</div>`
+    : '';
+
+  drawA4Sheet(sheetW, sheetH);
+}
+
+function drawA4Sheet(sheetW, sheetH){
+  const canvas=document.getElementById('a4-canvas');
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const padding=16;
+  const maxW=canvas.width-padding*2, maxH=canvas.height-padding*2;
+  const scale=Math.min(maxW/sheetW, maxH/sheetH);
+  const w=sheetW*scale, h=sheetH*scale;
+  const ox=(canvas.width-w)/2, oy=(canvas.height-h)/2;
+
+  ctx.fillStyle='#0a0a0c';
+  ctx.fillRect(ox,oy,w,h);
+  ctx.strokeStyle='rgba(255,255,255,0.2)';
+  ctx.strokeRect(ox,oy,w,h);
+
+  const sheet = a4Sheets[a4CurrentSheet] || [];
+  const palette=['#e8304f','#ff7a59','#c81e3a','#ff9fb0'];
+  sheet.forEach((it,idx)=>{
+    const px=ox+it.x*scale, py=oy+it.y*scale;
+    ctx.fillStyle = hexToRgba(palette[idx%palette.length], 0.35);
+    ctx.strokeStyle = palette[idx%palette.length];
+    ctx.lineWidth=1;
+    ctx.fillRect(px,py,it.w*scale,it.h*scale);
+    ctx.strokeRect(px,py,it.w*scale,it.h*scale);
+  });
+
+  document.getElementById('a4-sheet-label').textContent = `${a4CurrentSheet+1} / ${Math.max(a4Sheets.length,1)}`;
+}
+
+function hexToRgba(hex,alpha){
+  const c=hex.replace('#','');
+  const r=parseInt(c.substring(0,2),16), g=parseInt(c.substring(2,4),16), b=parseInt(c.substring(4,6),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function shiftSheet(dir){
+  if(a4Sheets.length===0) return;
+  a4CurrentSheet = (a4CurrentSheet + dir + a4Sheets.length) % a4Sheets.length;
+  const marginEdge=parseFloat(document.getElementById('a4-margin-edge').value)||0;
+  drawA4Sheet(21-marginEdge*2, 29.7-marginEdge*2);
+}
+
+function alertWarn(id,msg){
+  document.getElementById(id).innerHTML = `<div class="warn">${msg}</div>`;
+}
+
+/* ================= PRODUCTOS DE SUBLIMACION (generico) ================= */
+/* Catálogo de proveedor — Sublimark, Lista de Precios Dic. 2025.
+   Solo productos en blanco para sublimar (sin maquinaria, insumos, tintas,
+   papel, cinta, herrajes ni impresoras). Precios sin IVA, sujetos a cambio. */
+const supplierCatalog = {
+  mug: [
+    {name:'Mágica 11oz', price:32},
+    {name:'Mágica Glitter 11oz', price:38},
+    {name:'Mágica Corazón 11oz', price:42},
+    {name:'Mágica 3D 11oz', price:50},
+    {name:'Mágica Peltre Glitter 11oz', price:50},
+    {name:'Cónica Mágica 12oz', price:42},
+    {name:'Cónica Mágica 17oz negra', price:70},
+    {name:'Mágica Pareja 11oz', price:110},
+    {name:'Espejo 11oz', price:37},
+    {name:'Metálica tornasol 11oz', price:39},
+    {name:'Espejo combinada 11oz', price:43},
+    {name:'Glitter 11oz', price:31},
+    {name:'Glitter 11oz combinada', price:44},
+    {name:'Aperlada 11oz', price:41},
+    {name:'Neón 11oz', price:37},
+    {name:'Ventana 11oz', price:37},
+    {name:'Interior color 11oz', price:37},
+    {name:'Interior color 15oz', price:50},
+    {name:'Tapa silicón 11oz', price:38},
+    {name:'Interior color cónica 11oz', price:40},
+    {name:'Cuchara semicónica 11oz', price:45},
+    {name:'Cuchara recta 11oz', price:33},
+    {name:'Blanca 6oz', price:20.5},
+    {name:'Blanca base redonda 11oz', price:22.5},
+    {name:'Corazón blanca 11oz', price:30},
+    {name:'Cónica 12oz blanca', price:21.5},
+    {name:'Cónica 17oz blanca', price:44},
+    {name:'Blanca 15oz', price:33},
+    {name:'Pareja 11oz blanca', price:67},
+    {name:'Luminiscente 11oz', price:28},
+    {name:'Cristal 11oz transparente', price:28},
+    {name:'Cristal 11oz satinada', price:28},
+    {name:'Cristal 11oz color', price:28},
+    {name:'Peltre 6oz', price:45},
+    {name:'Peltre 11oz', price:60},
+    {name:'Peltre 11oz filo plata', price:65},
+    {name:'Cerámica tipo peltre 11oz', price:23},
+    {name:'6oz con plato blanco', price:55},
+    {name:'Alcancía cerámica', price:50},
+    {name:'Tequilero cristal grande', price:41},
+    {name:'Tequilero cristal chico', price:36},
+    {name:'Tequilero cerámica 2.5oz', price:21},
+    {name:'Tequilero glaseado 2.5oz', price:19}
+  ],
+  termo: [
+    {name:'Cilindro lata chica 300ml', price:40},
+    {name:'Cilindro lata grande 500ml', price:55},
+    {name:'Cilindro llavero 600ml', price:44},
+    {name:'Cilindro llavero 750ml', price:50},
+    {name:'Cilindro tapa transparente 750ml', price:64},
+    {name:'Cilindro botella niño 600ml', price:75},
+    {name:'Cilindro botella aro 750ml', price:74},
+    {name:'Cilindro botella de botón 750ml', price:70},
+    {name:'Cilindro botella cuello de color 750ml', price:105},
+    {name:'Termo lata chica 300ml', price:108},
+    {name:'Termo lata grande 500ml', price:132},
+    {name:'Taza viajera 16oz', price:82},
+    {name:'Vaso viajero 20oz', price:120},
+    {name:'Vaso viajero 30oz', price:135},
+    {name:'Vaso viajero cónico 20oz blanco/plata', price:135},
+    {name:'Botella lechera 500ml blanco/plata', price:133},
+    {name:'Vaso de acero delgado 600ml', price:135},
+    {name:'Tarro de acero 20oz', price:130},
+    {name:'Tarro de acero 300ml', price:120},
+    {name:'Botella lechera 500ml degradado', price:120},
+    {name:'Vaso vinero 300ml color', price:100},
+    {name:'Vaso vinero 300ml plata/blanco', price:96},
+    {name:'Vaso de acero 450ml doble pared', price:82},
+    {name:'Termo láser vaso delgado 600ml', price:130},
+    {name:'Termo láser vaso 20oz cónico', price:135},
+    {name:'Termo láser vaso playero', price:120},
+    {name:'Termo láser vaso doble 30oz', price:130},
+    {name:'Termo láser vaso vinero 300ml', price:92},
+    {name:'Vaso plástico cafetero 475ml', price:14},
+    {name:'Vaso plástico cafetero mágico', price:18},
+    {name:'Vaso plástico con popote 700ml', price:17},
+    {name:'Vaso plástico con popote y glitter 700ml', price:20},
+    {name:'Vaso cerámica 17oz sin cinta', price:59},
+    {name:'Vaso cerámica 17oz con cinta', price:54},
+    {name:'Vaso plástico 17oz', price:90},
+    {name:'Cervecero 16oz', price:45},
+    {name:'Cervecero color 16oz', price:63},
+    {name:'Meisón 500ml esmerilado', price:41},
+    {name:'Vaso delgado 700ml', price:82},
+    {name:'Vaso jalibero 270ml', price:23.5}
+  ],
+  playera: [
+    {name:'Playera hombre/mujer (Ch–ExG)', price:68},
+    {name:'Pañalero 3, 6, 9, 12 meses', price:50},
+    {name:'Banda edecán', price:60},
+    {name:'Funda cojín 43.5x36cm', price:25},
+    {name:'Funda almohada 71.4x48.8cm', price:50},
+    {name:'Servilleta 45x45cm', price:14},
+    {name:'Tortillero 22cm diámetro', price:16},
+    {name:'Bandera 32x39.5cm', price:8},
+    {name:'Pantufla', price:37},
+    {name:'Mandil blanco borde de color', price:30},
+    {name:'Mandil ecológico', price:15},
+    {name:'Mandil negro', price:30}
+  ],
+  gorra: [
+    {name:'Malla adulto/niño', price:20},
+    {name:'Gabardina', price:29},
+    {name:'Gorro safari sin capa', price:44},
+    {name:'Gorro safari con capa', price:49},
+    {name:'Plana acrilán o malla', price:30}
+  ],
+  puzzle: [
+    {name:'Cartón A4 blanco grueso', price:35},
+    {name:'Cartón A4 blanco estándar', price:30},
+    {name:'Cartón A4 blanco delgado (120 pzs)', price:17},
+    {name:'Cartón A3 blanco (375 pzs)', price:45},
+    {name:'Cartón corazón', price:35},
+    {name:'Cartón A5 blanco', price:22},
+    {name:'MDF corazón 17.5x16.3cm (11 pzs)', price:35},
+    {name:'MDF 4 pzs 16x16cm', price:25},
+    {name:'MDF 6 pzs 13.5x20cm', price:28},
+    {name:'MDF A4 20x28.5cm (12 pzs)', price:55},
+    {name:'Rompecabezas 12 pzs Acrisub', price:65}
+  ]
+};
+
+/* "Otros sublimables" — categorías con sus propios productos */
+const otrosCatalog = {
+  'Azulejos': [
+    {name:'Azulejo 10x10cm', price:20},
+    {name:'Azulejo 15x15cm', price:25},
+    {name:'Azulejo 20x30cm', price:75}
+  ],
+  'Llaveros': [
+    {name:'Llavero MDF', price:18},
+    {name:'Llavero metálico corazón/rectángulo', price:25},
+    {name:'Llavero metálico con espejo Tinec', price:28},
+    {name:'Llavero metálico con correa', price:50},
+    {name:'Identificador de perro', price:28}
+  ],
+  'Mousepads': [
+    {name:'Mousepad corazón 3mm', price:22},
+    {name:'Mousepad circular 3mm', price:22},
+    {name:'Mousepad rectangular delgado 1.75mm', price:16},
+    {name:'Mousepad rectangular grueso 3mm', price:22},
+    {name:'Portavaso circular', price:10},
+    {name:'Portavaso rectangular 3mm Acrisub', price:12}
+  ],
+  'Placas / Reconocimientos': [
+    {name:'Placa Bco./Oro/Plata 20x30cm', price:25},
+    {name:'Placa Bco./Oro/Plata 40x60cm', price:85},
+    {name:'Placa cepillada/espejo/gliter 20x30cm', price:35},
+    {name:'Placa cepillada/espejo/gliter 40x60cm', price:125},
+    {name:'Plato filo 20cm oro o plata', price:85}
+  ],
+  'Base madera y piedra': [
+    {name:'Base madera 33.5x24cm', price:125},
+    {name:'Base madera 66.6x44.7cm', price:350},
+    {name:'Base madera negra 33.5x24cm', price:130},
+    {name:'Piedra corazón chica 16cm', price:110},
+    {name:'Piedra corazón grande 23cm', price:125},
+    {name:'Piedra 30x19x2.7cm', price:140},
+    {name:'Piedra 31x31cm', price:160}
+  ],
+  'Bolsas y morrales': [
+    {name:'Mandarera M 34x29x9cm', price:18},
+    {name:'Mandarera Gde 39x34x9cm', price:20},
+    {name:'Ecológica 40x36x18cm', price:12},
+    {name:'Morral p/sublimar 34x42cm', price:22},
+    {name:'Morral ecológico 34x42cm', price:15},
+    {name:'Morral dulcero eco. 20.5x22cm', price:8},
+    {name:'Morral manta 20.5x22cm', price:15}
+  ],
+  'Banners': [
+    {name:'Banner 0.6x1.6m', price:140},
+    {name:'Banner 0.8x1.8m', price:150},
+    {name:'Banner 11x17"', price:25}
+  ],
+  'Porta retrato y papelería': [
+    {name:'Porta retrato MDF 15x20cm', price:32},
+    {name:'Porta retrato MDF 20x25cm', price:46},
+    {name:'Carpeta curpiel carta/oficio', price:80},
+    {name:'Carpeta vinil carta', price:60},
+    {name:'Carpeta vinil oficio', price:70},
+    {name:'Porta boleta carta', price:13},
+    {name:'Porta boleta oficio', price:14}
+  ],
+  'Accesorios': [
+    {name:'Popsocket blanco/negro', price:15},
+    {name:'Destapador sublimable', price:18},
+    {name:'Bata niño', price:60},
+    {name:'Letreros fiesta (paq. 5 pzs)', price:55}
+  ]
+};
+
+/* ---------- Categorías nuevas creadas por el usuario en "Otros sublimables" (persisten en este navegador) ---------- */
+const DEFAULT_OTROS_CATS = Object.keys(otrosCatalog);
+const CUSTOM_CATEGORIES_KEY = 'sarux_custom_categories_v1';
+
+function loadCustomCategories(){
+  try{
+    const cats = JSON.parse(localStorage.getItem(CUSTOM_CATEGORIES_KEY) || '[]');
+    cats.forEach(c=>{ if(!otrosCatalog[c]) otrosCatalog[c] = []; });
+  }catch(e){ console.error('No se pudieron leer las categorías guardadas', e); }
+}
+function saveCustomCategories(){
+  try{
+    const existing = JSON.parse(localStorage.getItem(CUSTOM_CATEGORIES_KEY) || '[]');
+    Object.keys(otrosCatalog).forEach(c=>{
+      if(!DEFAULT_OTROS_CATS.includes(c) && !existing.includes(c)) existing.push(c);
+    });
+    localStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify(existing));
+  }catch(e){ console.error('No se pudo guardar la categoría', e); }
+}
+loadCustomCategories();
+
+function createOtrosCategory(){
+  const input = document.getElementById('otros-newcat');
+  const statusEl = document.getElementById('otros-newcat-status');
+  const raw = (input.value||'').trim();
+  if(!raw){
+    statusEl.innerHTML = '<span style="color:var(--red-bright)">Escribe un nombre para la categoría.</span>';
+    return;
+  }
+  const exists = Object.keys(otrosCatalog).some(c=>normalizeName(c)===normalizeName(raw));
+  if(exists){
+    statusEl.innerHTML = '<span style="color:var(--red-bright)">Ya existe una categoría con ese nombre.</span>';
+    return;
+  }
+  otrosCatalog[raw] = [];
+  saveCustomCategories();
+  input.value = '';
+  statusEl.innerHTML = '<span style="color:var(--ok)">✓ Categoría "'+raw+'" creada — ya puedes agregarle productos abajo.</span>';
+  renderOtrosCategorySelect();
+  const catSel = document.getElementById('otros-cat');
+  if(catSel) catSel.value = raw;
+  renderOtrosProducts();
+}
+
+function renderOtrosCategorySelect(){
+  const sel = document.getElementById('otros-cat');
+  if(!sel) return;
+  const current = sel.value;
+  sel.innerHTML = Object.keys(otrosCatalog).map(c=>`<option value="${escapeAttr(c)}">${c}</option>`).join('');
+  if(Object.keys(otrosCatalog).includes(current)) sel.value = current;
+}
+
+/* ---------- Productos agregados por el usuario (persisten en este navegador) ---------- */
+const CUSTOM_PRODUCTS_KEY = 'sarux_custom_products_v1';
+const customAdditions = { supplier: {}, otros: {} };
+
+function normalizeName(s){ return (s||'').trim().toLowerCase().replace(/\s+/g,' '); }
+function escapeAttr(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function loadCustomAdditions(){
+  try{
+    const raw = localStorage.getItem(CUSTOM_PRODUCTS_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(parsed.supplier) Object.assign(customAdditions.supplier, parsed.supplier);
+      if(parsed.otros) Object.assign(customAdditions.otros, parsed.otros);
+    }
+  }catch(e){ console.error('No se pudieron leer los productos guardados', e); }
+
+  Object.keys(customAdditions.supplier).forEach(cat=>{
+    if(!supplierCatalog[cat]) supplierCatalog[cat] = [];
+    customAdditions.supplier[cat].forEach(it=>{
+      if(!supplierCatalog[cat].some(x=>normalizeName(x.name)===normalizeName(it.name))){
+        supplierCatalog[cat].push(it);
+      }
+    });
+  });
+  Object.keys(customAdditions.otros).forEach(cat=>{
+    if(!otrosCatalog[cat]) otrosCatalog[cat] = [];
+    customAdditions.otros[cat].forEach(it=>{
+      if(!otrosCatalog[cat].some(x=>normalizeName(x.name)===normalizeName(it.name))){
+        otrosCatalog[cat].push(it);
+      }
+    });
+  });
+}
+
+function saveCustomAdditions(){
+  try{ localStorage.setItem(CUSTOM_PRODUCTS_KEY, JSON.stringify(customAdditions)); }
+  catch(e){ console.error('No se pudo guardar el producto', e); }
+}
+
+loadCustomAdditions();
+
+/* ---------- Precios editados de productos que YA existen en el catálogo (persisten en este navegador) ---------- */
+const PRICE_OVERRIDES_KEY = 'sarux_price_overrides_v1';
+const priceOverrides = { supplier: {}, otros: {} };
+
+function loadPriceOverrides(){
+  try{
+    const raw = localStorage.getItem(PRICE_OVERRIDES_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(parsed.supplier) Object.assign(priceOverrides.supplier, parsed.supplier);
+      if(parsed.otros) Object.assign(priceOverrides.otros, parsed.otros);
+    }
+  }catch(e){ console.error('No se pudieron leer los precios editados', e); }
+
+  Object.keys(priceOverrides.supplier).forEach(cat=>{
+    (supplierCatalog[cat]||[]).forEach(it=>{
+      const key = normalizeName(it.name);
+      if(priceOverrides.supplier[cat][key] != null) it.price = priceOverrides.supplier[cat][key];
+    });
+  });
+  Object.keys(priceOverrides.otros).forEach(cat=>{
+    (otrosCatalog[cat]||[]).forEach(it=>{
+      const key = normalizeName(it.name);
+      if(priceOverrides.otros[cat][key] != null) it.price = priceOverrides.otros[cat][key];
+    });
+  });
+}
+
+function savePriceOverrides(){
+  try{ localStorage.setItem(PRICE_OVERRIDES_KEY, JSON.stringify(priceOverrides)); }
+  catch(e){ console.error('No se pudo guardar el precio', e); }
+}
+
+/* Llamada desde el input editable de la Lista de precios. type: 'supplier' | 'otros' */
+function updateCatalogPrice(type, catKey, itemName, newValue){
+  const price = parseFloat(newValue);
+  if(isNaN(price) || price < 0) return;
+  const catalog = type === 'supplier' ? supplierCatalog : otrosCatalog;
+  const items = catalog[catKey] || [];
+  const item = items.find(it => normalizeName(it.name) === normalizeName(itemName));
+  if(!item) return;
+  item.price = price;
+
+  const bucket = type === 'supplier' ? priceOverrides.supplier : priceOverrides.otros;
+  if(!bucket[catKey]) bucket[catKey] = {};
+  bucket[catKey][normalizeName(itemName)] = price;
+  savePriceOverrides();
+
+  renderListaTable();
+  const cotCatSel = document.getElementById('cot-cat');
+  if(cotCatSel) renderCotProductSelect();
+}
+
+loadPriceOverrides();
+
+/* ---------- Respaldo (exportar / importar) ---------- */
+function exportBackup(){
+  const backup = {
+    app: 'sarux-calculadora',
+    exportedAt: new Date().toISOString(),
+    customProducts: JSON.parse(localStorage.getItem(CUSTOM_PRODUCTS_KEY) || '{}'),
+    discountTiers: JSON.parse(localStorage.getItem(DISCOUNT_TIERS_KEY) || '{}'),
+    quoteCounter: localStorage.getItem(QUOTE_COUNTER_KEY) || '0',
+    savedQuotes: JSON.parse(localStorage.getItem(SAVED_QUOTES_KEY) || '[]'),
+    logo: localStorage.getItem(LOGO_KEY) || null,
+    cotPhone: localStorage.getItem(COT_PHONE_KEY) || '',
+    customCategories: JSON.parse(localStorage.getItem(CUSTOM_CATEGORIES_KEY) || '[]'),
+    priceOverrides: JSON.parse(localStorage.getItem(PRICE_OVERRIDES_KEY) || '{"supplier":{},"otros":{}}'),
+    almohadasSettings: JSON.parse(localStorage.getItem('sarux_almohadas_settings_v1') || 'null'),
+    sharedSettings: {
+      luz: document.getElementById('shared-luz') ? document.getElementById('shared-luz').value : null,
+      labor: document.getElementById('shared-labor') ? document.getElementById('shared-labor').value : null,
+      ink: document.getElementById('shared-ink') ? document.getElementById('shared-ink').value : null,
+      embalaje: document.getElementById('shared-embalaje') ? document.getElementById('shared-embalaje').value : null,
+      pasajes: document.getElementById('shared-pasajes') ? document.getElementById('shared-pasajes').value : null,
+      round: document.getElementById('shared-round') ? document.getElementById('shared-round').value : null,
+      ivaOn: document.getElementById('shared-iva-on') ? document.getElementById('shared-iva-on').checked : false,
+      ivaPct: document.getElementById('shared-iva-pct') ? document.getElementById('shared-iva-pct').value : null
+    }
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'sarux-respaldo-' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  const statusEl = document.getElementById('backup-status');
+  if(statusEl) statusEl.innerHTML = '<span style="color:var(--ok)">Respaldo descargado.</span>';
+}
+
+function importBackupFile(event){
+  const file = event.target.files[0];
+  const statusEl = document.getElementById('backup-status');
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const backup = JSON.parse(e.target.result);
+      if(backup.customProducts) localStorage.setItem(CUSTOM_PRODUCTS_KEY, JSON.stringify(backup.customProducts));
+      if(backup.discountTiers) localStorage.setItem(DISCOUNT_TIERS_KEY, JSON.stringify(backup.discountTiers));
+      if(backup.quoteCounter) localStorage.setItem(QUOTE_COUNTER_KEY, String(backup.quoteCounter));
+      if(backup.savedQuotes) localStorage.setItem(SAVED_QUOTES_KEY, JSON.stringify(backup.savedQuotes));
+      if(backup.logo) localStorage.setItem(LOGO_KEY, backup.logo);
+      if(backup.cotPhone != null) localStorage.setItem(COT_PHONE_KEY, backup.cotPhone);
+      if(backup.customCategories) localStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify(backup.customCategories));
+      if(backup.priceOverrides) localStorage.setItem(PRICE_OVERRIDES_KEY, JSON.stringify(backup.priceOverrides));
+      if(backup.almohadasSettings) localStorage.setItem('sarux_almohadas_settings_v1', JSON.stringify(backup.almohadasSettings));
+      if(backup.sharedSettings){
+        localStorage.setItem(SHARED_SETTINGS_KEY, JSON.stringify(backup.sharedSettings));
+      }
+      if(statusEl) statusEl.innerHTML = '<span style="color:var(--ok)">Respaldo importado. Recargando…</span>';
+      setTimeout(()=>location.reload(), 800);
+    }catch(err){
+      if(statusEl) statusEl.innerHTML = '<span style="color:var(--red-bright)">Ese archivo no es un respaldo válido.</span>';
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* Guarda y restaura los costos compartidos (luz, mano de obra, hoja, redondeo, IVA) automáticamente en este navegador */
+const SHARED_SETTINGS_KEY = 'sarux_shared_settings_v1';
+function applySavedSharedSettings(){
+  try{
+    const raw = localStorage.getItem(SHARED_SETTINGS_KEY);
+    if(!raw) return;
+    const s = JSON.parse(raw);
+    if(s.luz != null && document.getElementById('shared-luz')) document.getElementById('shared-luz').value = s.luz;
+    if(s.labor != null && document.getElementById('shared-labor')) document.getElementById('shared-labor').value = s.labor;
+    if(s.ink != null && document.getElementById('shared-ink')) document.getElementById('shared-ink').value = s.ink;
+    if(s.embalaje != null && document.getElementById('shared-embalaje')) document.getElementById('shared-embalaje').value = s.embalaje;
+    if(s.pasajes != null && document.getElementById('shared-pasajes')) document.getElementById('shared-pasajes').value = s.pasajes;
+    if(s.round != null && document.getElementById('shared-round')) document.getElementById('shared-round').value = s.round;
+    if(document.getElementById('shared-iva-on')) document.getElementById('shared-iva-on').checked = !!s.ivaOn;
+    if(s.ivaPct != null && document.getElementById('shared-iva-pct')) document.getElementById('shared-iva-pct').value = s.ivaPct;
+  }catch(e){ console.error('No se pudieron aplicar los ajustes guardados', e); }
+}
+function saveSharedSettings(){
+  try{
+    const s = {
+      luz: document.getElementById('shared-luz') ? document.getElementById('shared-luz').value : null,
+      labor: document.getElementById('shared-labor') ? document.getElementById('shared-labor').value : null,
+      ink: document.getElementById('shared-ink') ? document.getElementById('shared-ink').value : null,
+      embalaje: document.getElementById('shared-embalaje') ? document.getElementById('shared-embalaje').value : null,
+      pasajes: document.getElementById('shared-pasajes') ? document.getElementById('shared-pasajes').value : null,
+      round: document.getElementById('shared-round') ? document.getElementById('shared-round').value : null,
+      ivaOn: document.getElementById('shared-iva-on') ? document.getElementById('shared-iva-on').checked : false,
+      ivaPct: document.getElementById('shared-iva-pct') ? document.getElementById('shared-iva-pct').value : null
+    };
+    localStorage.setItem(SHARED_SETTINGS_KEY, JSON.stringify(s));
+    const statusEl = document.getElementById('shared-save-status');
+    if(statusEl){
+      statusEl.textContent = 'Guardado ✓';
+      clearTimeout(saveSharedSettings._t);
+      saveSharedSettings._t = setTimeout(()=>{ statusEl.textContent=''; }, 1500);
+    }
+  }catch(e){ console.error('No se pudieron guardar los ajustes', e); }
+}
+/* Se aplica de inmediato (antes de construir las tablas de precios y cotización) para que usen los valores guardados desde el primer render */
+applySavedSharedSettings();
+
+/* ---------- Logo para cotizaciones ---------- */
+const LOGO_KEY = 'sarux_logo_b64';
+
+/* Achica la imagen antes de guardarla (nadie necesita un logo en full resolución de cámara,
+   y una foto pesada puede rebasar el espacio de guardado del navegador sin avisar). */
+function resizeImageDataUrl(dataUrl, maxSize){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    img.onload = function(){
+      let { width, height } = img;
+      if(width > maxSize || height > maxSize){
+        const scale = maxSize / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/png', 0.9));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+function uploadLogo(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('logo-status');
+  if(statusEl) statusEl.innerHTML = 'Procesando imagen…';
+  const reader = new FileReader();
+  reader.onload = async function(e){
+    try{
+      const resized = await resizeImageDataUrl(e.target.result, 500);
+      localStorage.setItem(LOGO_KEY, resized);
+      if(statusEl) statusEl.innerHTML = '<span style="color:var(--ok)">✔ Logo guardado</span>';
+    }catch(err){
+      console.error('No se pudo guardar el logo', err);
+      if(statusEl) statusEl.innerHTML = '<span style="color:var(--red-bright)">⚠️ No se pudo guardar — intenta con una imagen más ligera (menos de 5MB) o en formato JPG/PNG.</span>';
+    }
+    renderLogoPreview();
+  };
+  reader.onerror = function(){
+    if(statusEl) statusEl.innerHTML = '<span style="color:var(--red-bright)">⚠️ No se pudo leer el archivo.</span>';
+  };
+  reader.readAsDataURL(file);
+}
+function removeLogo(){
+  localStorage.removeItem(LOGO_KEY);
+  renderLogoPreview();
+}
+function renderLogoPreview(){
+  const preview = document.getElementById('logo-preview');
+  const removeWrap = document.getElementById('logo-remove-wrap');
+  if(!preview) return;
+  const logo = localStorage.getItem(LOGO_KEY);
+  if(logo){
+    preview.innerHTML = `<img src="${logo}" style="max-width:160px;max-height:100px;border-radius:8px;border:1px solid var(--line);">`;
+    if(removeWrap) removeWrap.style.display='block';
+  } else {
+    preview.innerHTML = '';
+    if(removeWrap) removeWrap.style.display='none';
+  }
+}
+
+/* ---------- Teléfono / WhatsApp de contacto para cotizaciones ---------- */
+const COT_PHONE_KEY = 'sarux_cot_phone';
+function saveCotPhone(){
+  const input = document.getElementById('cot-phone-input');
+  const statusEl = document.getElementById('cot-phone-status');
+  if(!input) return;
+  try{
+    localStorage.setItem(COT_PHONE_KEY, input.value || '');
+    if(statusEl) statusEl.innerHTML = '<span style="color:var(--ok)">✓ Guardado</span>';
+  }catch(e){ console.error('No se pudo guardar el teléfono', e); }
+}
+function renderCotPhonePreview(){
+  const input = document.getElementById('cot-phone-input');
+  if(!input) return;
+  input.value = localStorage.getItem(COT_PHONE_KEY) || '';
+}
+
+function getCatalogArrayFor(id){
+  if(id === 'otros'){
+    const cat = document.getElementById('otros-cat').value;
+    if(!otrosCatalog[cat]) otrosCatalog[cat] = [];
+    return {arr: otrosCatalog[cat], key: cat, isOtros: true};
+  }
+  if(!supplierCatalog[id]) supplierCatalog[id] = [];
+  return {arr: supplierCatalog[id], key: id, isOtros: false};
+}
+
+function checkDuplicate(id){
+  const nameInput = document.getElementById(id+'-newname');
+  const suggBox = document.getElementById(id+'-suggestions');
+  const warnBox = document.getElementById(id+'-dupwarn');
+  if(!nameInput || !suggBox || !warnBox) return;
+
+  const name = nameInput.value;
+  const norm = normalizeName(name);
+  const {arr} = getCatalogArrayFor(id);
+
+  if(norm.length === 0){
+    suggBox.innerHTML = '';
+    warnBox.innerHTML = '';
+    return;
+  }
+
+  const matches = arr.filter(it => normalizeName(it.name).includes(norm));
+  suggBox.innerHTML = matches.length
+    ? matches.slice(0,6).map(it=>`<div class="suggest-item">${it.name} — $${it.price.toFixed(2)}</div>`).join('')
+    : '<div class="suggest-item muted">Sin coincidencias — parece nuevo</div>';
+
+  const exact = arr.some(it => normalizeName(it.name) === norm);
+  warnBox.innerHTML = exact ? '<div class="warn">Ese producto ya está en la lista — revisa las coincidencias de arriba.</div>' : '';
+}
+
+function addCustomProduct(id){
+  const nameInput = document.getElementById(id+'-newname');
+  const priceInput = document.getElementById(id+'-newprice');
+  const name = (nameInput.value||'').trim();
+  const price = parseFloat(priceInput.value);
+  const warnBox = document.getElementById(id+'-dupwarn');
+
+  if(!name || !(price>0)){
+    warnBox.innerHTML = '<div class="warn">Escribe un nombre y un precio válido antes de agregar.</div>';
+    return;
+  }
+
+  const {arr, key, isOtros} = getCatalogArrayFor(id);
+  const norm = normalizeName(name);
+  if(arr.some(it=>normalizeName(it.name)===norm)){
+    warnBox.innerHTML = '<div class="warn">Ese producto ya existe, no se agregó de nuevo.</div>';
+    return;
+  }
+
+  const item = {name, price};
+  arr.push(item);
+
+  if(isOtros){
+    if(!customAdditions.otros[key]) customAdditions.otros[key] = [];
+    customAdditions.otros[key].push(item);
+  } else {
+    if(!customAdditions.supplier[key]) customAdditions.supplier[key] = [];
+    customAdditions.supplier[key].push(item);
+  }
+  saveCustomAdditions();
+
+  if(id === 'otros'){
+    renderOtrosProducts();
+  } else {
+    refreshSupplierSelect(id);
+  }
+
+  nameInput.value = '';
+  priceInput.value = '';
+  document.getElementById(id+'-suggestions').innerHTML = '';
+  warnBox.innerHTML = '<div class="stat" style="border-color:var(--ok);margin-top:8px;"><div class="label">Agregado</div><div class="val ok">✓ '+name+'</div></div>';
+
+  renderCustomProductsList(id);
+  if(document.getElementById('lista-tbody')) renderListaTable();
+}
+
+/* ---------- Editar / borrar SOLO los productos que tú agregaste ---------- */
+function renderCustomProductsList(id){
+  const container = document.getElementById(id+'-customlist');
+  if(!container) return;
+
+  let items, catKey;
+  if(id === 'otros'){
+    catKey = document.getElementById('otros-cat') ? document.getElementById('otros-cat').value : null;
+    items = catKey ? (customAdditions.otros[catKey] || []) : [];
+  } else {
+    items = customAdditions.supplier[id] || [];
+  }
+
+  if(items.length === 0){
+    container.innerHTML = '<p class="sub" style="margin:8px 0 0;">Tus productos agregados en esta categoría aparecerán aquí, con opción de editar precio o borrar.</p>';
+    return;
+  }
+
+  container.innerHTML = '<p class="sub" style="margin-bottom:8px;">Tus productos agregados aquí:</p>' + items.map((it,i)=>`
+    <div class="stat" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="flex:1;font-size:13px;">${it.name}</div>
+      <input type="number" value="${it.price}" step="0.5" style="width:90px;" onchange="editCustomProduct('${id}',${i},this.value)">
+      <button class="icon-btn" onclick="deleteCustomProduct('${id}',${i})">×</button>
+    </div>`).join('');
+}
+
+function editCustomProduct(id, i, newPrice){
+  const price = parseFloat(newPrice) || 0;
+  const {deltaArr, mainArr} = getCustomRefs(id);
+  if(!deltaArr || !deltaArr[i]) return;
+  const name = deltaArr[i].name;
+  deltaArr[i].price = price;
+  const mainItem = mainArr.find(x=>normalizeName(x.name)===normalizeName(name));
+  if(mainItem) mainItem.price = price;
+  saveCustomAdditions();
+  if(id === 'otros'){ renderOtrosProducts(); } else { refreshSupplierSelect(id); }
+  renderCustomProductsList(id);
+  if(document.getElementById('lista-tbody')) renderListaTable();
+}
+
+function deleteCustomProduct(id, i){
+  const {deltaArr, mainArr} = getCustomRefs(id);
+  if(!deltaArr || !deltaArr[i]) return;
+  const name = deltaArr[i].name;
+  deltaArr.splice(i,1);
+  const idx = mainArr.findIndex(x=>normalizeName(x.name)===normalizeName(name));
+  if(idx >= 0) mainArr.splice(idx,1);
+  saveCustomAdditions();
+  if(id === 'otros'){ renderOtrosProducts(); } else { refreshSupplierSelect(id); }
+  renderCustomProductsList(id);
+  if(document.getElementById('lista-tbody')) renderListaTable();
+}
+
+function getCustomRefs(id){
+  if(id === 'otros'){
+    const cat = document.getElementById('otros-cat').value;
+    if(!customAdditions.otros[cat]) customAdditions.otros[cat] = [];
+    if(!otrosCatalog[cat]) otrosCatalog[cat] = [];
+    return {deltaArr: customAdditions.otros[cat], mainArr: otrosCatalog[cat]};
+  }
+  if(!customAdditions.supplier[id]) customAdditions.supplier[id] = [];
+  if(!supplierCatalog[id]) supplierCatalog[id] = [];
+  return {deltaArr: customAdditions.supplier[id], mainArr: supplierCatalog[id]};
+}
+
+function refreshSupplierSelect(id){
+  const sel = document.getElementById(id+'-supplier');
+  if(!sel) return;
+  const items = supplierCatalog[id] || [];
+  const options = items.map(it=>`<option value="${it.price}">${it.name} — $${it.price.toFixed(2)}</option>`).join('');
+  sel.innerHTML = `<option value="">— Selecciona o captura manual —</option>${options}`;
+}
+
+/* ---------- Descuento por volumen del proveedor (editable, por categoría) ---------- */
+const DISCOUNT_TIERS_KEY = 'sarux_discount_tiers_v1';
+const discountTierData = {
+  mug:     [{from:1, discount:0}, {from:12, discount:8}, {from:36, discount:15}],
+  termo:   [{from:1, discount:0}, {from:12, discount:8}, {from:36, discount:15}],
+  playera: [{from:1, discount:0}, {from:12, discount:8}, {from:36, discount:15}],
+  gorra:   [{from:1, discount:0}, {from:12, discount:8}, {from:36, discount:15}],
+  puzzle:  [{from:1, discount:0}, {from:12, discount:8}, {from:36, discount:15}],
+  otros:   [{from:1, discount:0}, {from:12, discount:8}, {from:36, discount:15}],
+  playeradtf:  [{from:1, discount:0}, {from:12, discount:8}, {from:36, discount:15}],
+  sudaderadtf: [{from:1, discount:0}, {from:12, discount:5}, {from:36, discount:8}]
+};
+
+function loadDiscountTiers(){
+  try{
+    const raw = localStorage.getItem(DISCOUNT_TIERS_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      Object.keys(parsed).forEach(k=>{ discountTierData[k] = parsed[k]; });
+    }
+  }catch(e){ console.error('No se pudo leer la tabla de descuentos', e); }
+}
+function saveDiscountTiers(){
+  try{ localStorage.setItem(DISCOUNT_TIERS_KEY, JSON.stringify(discountTierData)); }
+  catch(e){ console.error('No se pudo guardar la tabla de descuentos', e); }
+}
+loadDiscountTiers();
+
+/* Cada categoría de "Otros sublimables" tiene su propia tabla de descuento
+   (clave 'otros::NombreCategoría'). Si una categoría todavía no tiene la suya
+   (porque nunca la han editado), se usa como respaldo la tabla general 'otros'
+   para no perder los datos que ya tenían antes de este cambio. */
+function tierDiscountFor(id, qty){
+  let tiers = discountTierData[id];
+  if((!tiers || !tiers.length) && typeof id === 'string' && id.indexOf('otros::') === 0){
+    tiers = discountTierData['otros'];
+  }
+  tiers = [...(tiers||[])].sort((a,b)=>a.from-b.from);
+  let discount = 0;
+  tiers.forEach(t=>{ if(qty >= t.from) discount = t.discount; });
+  return discount;
+}
+
+/* dataKey identifica en qué tabla se guarda (por categoría en el caso de Otros sublimables).
+   elPrefix identifica los elementos del DOM a actualizar (siempre fijo, ej. 'otros'), y por
+   defecto es igual a dataKey para los productos que tienen su propio panel (taza, termo, etc). */
+function renderDiscountTierTable(dataKey, elPrefix){
+  elPrefix = elPrefix || dataKey;
+  const tbody = document.getElementById(elPrefix+'-tiertable');
+  if(!tbody) return;
+  const tiers = otrosTiersFor(dataKey);
+  tbody.innerHTML = tiers.map((t,i)=>`
+    <tr>
+      <td><input type="number" step="1" value="${t.from}" onchange="updateTier('${escapeAttr(dataKey)}',${i},'from',this.value,'${elPrefix}')"></td>
+      <td><input type="number" step="1" value="${t.discount}" onchange="updateTier('${escapeAttr(dataKey)}',${i},'discount',this.value,'${elPrefix}')"></td>
+      <td><button class="icon-btn" onclick="removeTier('${escapeAttr(dataKey)}',${i},'${elPrefix}')">×</button></td>
+    </tr>`).join('');
+}
+/* Tiers a mostrar para dataKey: los propios si ya existen, si no los de 'otros' como base de partida. */
+function otrosTiersFor(dataKey){
+  if(discountTierData[dataKey] && discountTierData[dataKey].length) return discountTierData[dataKey];
+  if(typeof dataKey === 'string' && dataKey.indexOf('otros::') === 0) return discountTierData['otros'] || [];
+  return discountTierData[dataKey] || [];
+}
+function updateTier(dataKey, i, field, value, elPrefix){
+  elPrefix = elPrefix || dataKey;
+  ensureOwnTierTable(dataKey);
+  discountTierData[dataKey][i][field] = parseFloat(value) || 0;
+  saveDiscountTiers();
+  autoFillDiscount(dataKey, elPrefix);
+}
+function addTier(dataKey, elPrefix){
+  elPrefix = elPrefix || dataKey;
+  ensureOwnTierTable(dataKey);
+  discountTierData[dataKey].push({from:1, discount:0});
+  saveDiscountTiers();
+  renderDiscountTierTable(dataKey, elPrefix);
+}
+function removeTier(dataKey, i, elPrefix){
+  elPrefix = elPrefix || dataKey;
+  ensureOwnTierTable(dataKey);
+  discountTierData[dataKey].splice(i,1);
+  saveDiscountTiers();
+  renderDiscountTierTable(dataKey, elPrefix);
+  autoFillDiscount(dataKey, elPrefix);
+}
+/* La primera vez que se edita la tabla de una categoría de Otros sublimables,
+   se le da su propia copia (partiendo de la tabla general) en vez de seguir
+   compartiendo la de las otras 14 categorías. */
+function ensureOwnTierTable(dataKey){
+  if(discountTierData[dataKey]) return;
+  if(typeof dataKey === 'string' && dataKey.indexOf('otros::') === 0){
+    discountTierData[dataKey] = JSON.parse(JSON.stringify(discountTierData['otros'] || [{from:1,discount:0},{from:12,discount:8},{from:36,discount:15}]));
+  } else {
+    discountTierData[dataKey] = [];
+  }
+}
+function autoFillDiscount(dataKey, elPrefix){
+  elPrefix = elPrefix || dataKey;
+  const qtyEl = document.getElementById(elPrefix+'-qty');
+  const discEl = document.getElementById(elPrefix+'-discount');
+  if(!qtyEl || !discEl) return;
+  const qty = parseInt(qtyEl.value) || 0;
+  discEl.value = tierDiscountFor(dataKey, qty);
+}
+/* Clave de la tabla de descuento para la categoría de Otros sublimables actualmente seleccionada. */
+function currentOtrosTierKey(){
+  const catEl = document.getElementById('otros-cat');
+  const cat = catEl ? catEl.value : '';
+  return 'otros::'+cat;
+}
+
+/* ---------- Panel central de descuentos por volumen (pestaña 00 · Costos compartidos) ----------
+   Muestra y edita las mismas tablas (discountTierData) que cada pestaña de producto,
+   para no tener que entrar a cada una por separado. Al editar aquí, se guarda en el
+   mismo lugar de siempre y se refresca también la tabla de la pestaña del producto
+   (si ya está construida en el DOM). */
+const CENTRAL_TIER_CATEGORIES = [
+  {id:'mug', label:'Tazas / Mugs'},
+  {id:'termo', label:'Termos / Tumblers'},
+  {id:'playera', label:'Playeras (sublimado)'},
+  {id:'gorra', label:'Gorras'},
+  {id:'puzzle', label:'Rompecabezas'},
+  {id:'otros', label:'Otros sublimables (tabla general)'},
+  {id:'playeradtf', label:'Playera + DTF'},
+  {id:'sudaderadtf', label:'Sudadera + DTF'}
+];
+
+function buildCentralTiersGrid(){
+  const grid = document.getElementById('central-tiers-grid');
+  if(!grid) return;
+  grid.innerHTML = CENTRAL_TIER_CATEGORIES.map(c => `
+    <div class="card" style="margin-bottom:0;">
+      <h2 style="font-size:14px;"><span class="dot"></span>${c.label}</h2>
+      <table>
+        <thead><tr><th>Desde (pzas)</th><th>Descuento %</th><th></th></tr></thead>
+        <tbody id="central-${c.id}-tiertable"></tbody>
+      </table>
+      <div class="actions"><button class="btn ghost small" onclick="addTierCentral('${c.id}')">+ Agregar rango</button></div>
+    </div>
+  `).join('');
+  CENTRAL_TIER_CATEGORIES.forEach(c => renderCentralTierTable(c.id));
+}
+
+function renderCentralTierTable(dataKey){
+  const tbody = document.getElementById('central-'+dataKey+'-tiertable');
+  if(!tbody) return;
+  const tiers = otrosTiersFor(dataKey);
+  tbody.innerHTML = tiers.map((t,i)=>`
+    <tr>
+      <td><input type="number" step="1" value="${t.from}" onchange="updateTierCentral('${escapeAttr(dataKey)}',${i},'from',this.value)"></td>
+      <td><input type="number" step="1" value="${t.discount}" onchange="updateTierCentral('${escapeAttr(dataKey)}',${i},'discount',this.value)"></td>
+      <td><button class="icon-btn" onclick="removeTierCentral('${escapeAttr(dataKey)}',${i})">×</button></td>
+    </tr>`).join('');
+}
+
+/* Después de cada cambio, refresca la tabla central Y la tabla de la pestaña del
+   producto correspondiente (si existe en el DOM), para que ambas queden sincronizadas. */
+function syncTierTables(dataKey){
+  renderCentralTierTable(dataKey);
+  renderDiscountTierTable(dataKey);
+  autoFillDiscount(dataKey);
+}
+
+function updateTierCentral(dataKey, i, field, value){
+  ensureOwnTierTable(dataKey);
+  discountTierData[dataKey][i][field] = parseFloat(value) || 0;
+  saveDiscountTiers();
+  syncTierTables(dataKey);
+}
+function addTierCentral(dataKey){
+  ensureOwnTierTable(dataKey);
+  discountTierData[dataKey].push({from:1, discount:0});
+  saveDiscountTiers();
+  syncTierTables(dataKey);
+}
+function removeTierCentral(dataKey, i){
+  ensureOwnTierTable(dataKey);
+  discountTierData[dataKey].splice(i,1);
+  saveDiscountTiers();
+  syncTierTables(dataKey);
+}
+
+/* Config por categoría: cuántos diseños caben por hoja por defecto,
+   tiempo de prensado y empaque. El de tazas es 3 porque así te caben
+   en las de 11oz — cámbialo a 1 o 2 si usas otro tamaño. */
+const productConfigs = [
+  { id:'mug', title:'Taza en blanco', qtyDefault:12,
+    blankDefault:35, designsDefault:3, timeDefault:5, packDefault:5 },
+  { id:'termo', title:'Termo / tumbler en blanco', qtyDefault:12,
+    blankDefault:90, designsDefault:1, timeDefault:6, packDefault:8 },
+  { id:'playera', title:'Playera en blanco', qtyDefault:12,
+    blankDefault:60, designsDefault:1, timeDefault:8, packDefault:5 },
+  { id:'gorra', title:'Gorra en blanco', qtyDefault:12,
+    blankDefault:45, designsDefault:1, timeDefault:4, packDefault:4 },
+  { id:'puzzle', title:'Rompecabezas en blanco', qtyDefault:12,
+    blankDefault:40, designsDefault:1, timeDefault:5, packDefault:6 }
+];
+const OTROS_DEFAULT = { designsDefault:1, timeDefault:4, packDefault:4 };
+
+function buildProductPanel(cfg){
+  const supplierItems = supplierCatalog[cfg.id] || [];
+  const supplierOptions = supplierItems.map(it =>
+    `<option value="${it.price}" data-name="${escapeAttr(it.name)}">${it.name} — $${it.price.toFixed(2)}</option>`
+  ).join('');
+
+  const supplierHtml = supplierItems.length ? `
+          <div class="field">
+            <label>Producto del proveedor (opcional)</label>
+            <select id="${cfg.id}-supplier" onchange="applySupplierPrice('${cfg.id}')">
+              <option value="">— Selecciona o captura manual —</option>
+              ${supplierOptions}
+            </select>
+          </div>` : '';
+
+  return `
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2><span class="dot"></span>${cfg.title}</h2>
+          ${supplierHtml}
+          <div class="field"><label>Costo del producto en blanco ($)</label><input type="number" id="${cfg.id}-blank" value="${cfg.blankDefault}" step="0.5"></div>
+          <div class="actions"><button class="btn ghost small" onclick="saveBlankPriceToCatalog('${cfg.id}')">💾 Guardar este precio en el catálogo</button></div>
+          <p class="note-line" id="${cfg.id}-save-status"></p>
+          <p class="sub" style="margin-top:-4px;">Este campo solo se usa para calcular. Si quieres que el precio del proveedor cambie de verdad (y se refleje en Lista de precios y Cotización), selecciónalo arriba, ajusta el número, y pulsa el botón.</p>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Agregar producto nuevo</h2>
+          <p class="sub">Escribe el nombre — te muestro si ya existe algo parecido en esta categoría.</p>
+          <div class="row2">
+            <div class="field"><label>Nombre</label><input type="text" id="${cfg.id}-newname" placeholder="Ej. Taza mate 12oz" oninput="checkDuplicate('${cfg.id}')"></div>
+            <div class="field"><label>Precio ($)</label><input type="number" id="${cfg.id}-newprice" placeholder="0.00" step="0.5"></div>
+          </div>
+          <div class="suggest-box" id="${cfg.id}-suggestions"></div>
+          <div id="${cfg.id}-dupwarn"></div>
+          <div class="actions"><button class="btn ghost small" onclick="addCustomProduct('${cfg.id}')">+ Agregar a la lista</button></div>
+          <div id="${cfg.id}-customlist" style="margin-top:14px;"></div>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Impresión</h2>
+          <div class="field"><label>Diseños que caben por hoja</label><input type="number" id="${cfg.id}-designs" value="${cfg.designsDefault}" step="1" min="1"></div>
+          <p class="sub" style="margin-top:-8px;">Usa el costo de hoja de la pestaña <strong>00 · Costos compartidos</strong>.</p>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Tiempo y empaque</h2>
+          <div class="row2">
+            <div class="field"><label>Tiempo de prensado (min)</label><input type="number" id="${cfg.id}-time" value="${cfg.timeDefault}" step="1"></div>
+            <div class="field"><label>Empaque ($)</label><input type="number" id="${cfg.id}-pack" value="${cfg.packDefault}" step="0.5"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Descuento por volumen del proveedor</h2>
+          <p class="sub">A partir de cuántas piezas el proveedor te da qué % de descuento en el blanco. Se aplica solo cuando la cantidad de mayoreo alcanza ese rango.</p>
+          <table>
+            <thead><tr><th>Desde (pzas)</th><th>Descuento %</th><th></th></tr></thead>
+            <tbody id="${cfg.id}-tiertable"></tbody>
+          </table>
+          <div class="actions"><button class="btn ghost small" onclick="addTier('${cfg.id}')">+ Agregar rango</button></div>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Margen y mayoreo</h2>
+          <div class="row2">
+            <div class="field"><label>Margen deseado (%)</label><input type="number" id="${cfg.id}-margin" value="40" step="1"></div>
+            <div class="field"><label>Cantidad para mayoreo</label><input type="number" id="${cfg.id}-qty" value="${cfg.qtyDefault}" step="1" oninput="autoFillDiscount('${cfg.id}')"></div>
+          </div>
+          <div class="field"><label>Descuento en mayoreo (%)</label><input type="number" id="${cfg.id}-discount" value="0" step="1" min="0" max="90"></div>
+          <p class="sub" style="margin-top:-8px;">Se rellena solo según la tabla de arriba y la cantidad — puedes ajustarlo a mano si quieres.</p>
+          <div class="actions"><button class="btn" onclick="calcProduct('${cfg.id}')">Calcular</button></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="results" id="${cfg.id}-results" style="display:none;">
+          <h2><span class="dot" style="background:var(--ok)"></span>Por pieza</h2>
+          <div class="stat-grid" id="${cfg.id}-stats-unit"></div>
+          <h2 style="margin-top:20px;"><span class="dot" style="background:var(--ok)"></span>Por mayoreo</h2>
+          <div class="stat-grid" id="${cfg.id}-stats-bulk"></div>
+          <div class="actions" style="margin-top:14px;">
+            <button class="btn" onclick="addCalcToQuote('${cfg.id}','${escapeAttr(cfg.title)}')">+ Agregar a cotización</button>
+          </div>
+          <p class="note-line" id="${cfg.id}-quote-status"></p>
+        </div>
+        <div class="empty" id="${cfg.id}-empty">Completa los datos y pulsa <strong>Calcular</strong> para ver el resultado.</div>
+      </div>
+    </div>
+  `;
+}
+
+productConfigs.forEach(cfg=>{
+  document.getElementById('panel-'+cfg.id).innerHTML = buildProductPanel(cfg);
+  renderDiscountTierTable(cfg.id);
+  autoFillDiscount(cfg.id);
+  renderCustomProductsList(cfg.id);
+});
+
+function applySupplierPrice(id){
+  const sel = document.getElementById(id+'-supplier');
+  if(sel.value !== ''){
+    document.getElementById(id+'-blank').value = parseFloat(sel.value).toFixed(2);
+  }
+}
+
+/* Guarda el valor del campo "Costo del producto en blanco" de vuelta al catálogo,
+   para el producto del proveedor seleccionado arriba en esa misma pestaña. */
+function saveBlankPriceToCatalog(id){
+  const statusEl = document.getElementById(id+'-save-status');
+  const sel = document.getElementById(id+'-supplier');
+  const blankInput = document.getElementById(id+'-blank');
+  if(!sel || sel.value === ''){
+    if(statusEl) statusEl.innerHTML = '<span style="color:var(--red-bright)">Primero selecciona un producto del proveedor arriba.</span>';
+    return;
+  }
+  const opt = sel.options[sel.selectedIndex];
+  const name = opt.getAttribute('data-name');
+  const newPrice = parseFloat(blankInput.value);
+  if(isNaN(newPrice) || newPrice < 0){
+    if(statusEl) statusEl.innerHTML = '<span style="color:var(--red-bright)">Pon un costo válido.</span>';
+    return;
+  }
+  const catKey = id === 'otros' ? document.getElementById('otros-cat').value : id;
+  const type = id === 'otros' ? 'otros' : 'supplier';
+  updateCatalogPrice(type, catKey, name, newPrice);
+
+  // refresca el propio dropdown de esta pestaña para que muestre el precio nuevo
+  if(id === 'otros'){ renderOtrosProducts(); }
+  else {
+    const supplierItems = supplierCatalog[id] || [];
+    sel.innerHTML = supplierItems.map(it =>
+      `<option value="${it.price}" data-name="${escapeAttr(it.name)}">${it.name} — $${it.price.toFixed(2)}</option>`
+    ).join('') ;
+    sel.innerHTML = `<option value="">— Selecciona o captura manual —</option>` + sel.innerHTML;
+    // vuelve a seleccionar el mismo producto
+    const match = Array.from(sel.options).find(o => o.getAttribute('data-name') === name);
+    if(match) match.selected = true;
+  }
+  if(statusEl) statusEl.innerHTML = `<span style="color:var(--ok)">Precio de "${name}" actualizado a $${newPrice.toFixed(2)} — guardado ✓</span>`;
+}
+
+/* ---------- Panel "Otros sublimables" (categoría + producto en cascada) ---------- */
+function buildOtrosPanel(){
+  const categories = Object.keys(otrosCatalog);
+  const catOptions = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+
+  return `
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2><span class="dot"></span>Producto del proveedor</h2>
+          <div class="field">
+            <label>Categoría</label>
+            <select id="otros-cat" onchange="renderOtrosProducts()">${catOptions}</select>
+          </div>
+          <div class="field">
+            <label>Producto</label>
+            <select id="otros-supplier" onchange="applySupplierPrice('otros')"></select>
+          </div>
+          <div class="field"><label>Costo del producto en blanco ($)</label><input type="number" id="otros-blank" value="20" step="0.5"></div>
+          <div class="actions"><button class="btn ghost small" onclick="saveBlankPriceToCatalog('otros')">💾 Guardar este precio en el catálogo</button></div>
+          <p class="note-line" id="otros-save-status"></p>
+          <p class="sub" style="margin-top:-4px;">Este campo solo se usa para calcular. Si quieres que el precio del proveedor cambie de verdad, selecciónalo arriba, ajusta el número, y pulsa el botón.</p>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Crear categoría nueva</h2>
+          <p class="sub">Arma una categoría propia dentro de "Otros sublimables" — no solo agregar a las que ya existen.</p>
+          <div class="row2">
+            <div class="field" style="flex:1;"><label>Nombre de la categoría</label><input type="text" id="otros-newcat" placeholder="Ej. Relojes de pared"></div>
+          </div>
+          <div class="actions"><button class="btn ghost small" onclick="createOtrosCategory()">+ Crear categoría</button></div>
+          <p class="note-line" id="otros-newcat-status"></p>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Agregar producto nuevo</h2>
+          <p class="sub">Se agrega a la categoría seleccionada arriba. Escribe el nombre — te muestro si ya existe algo parecido.</p>
+          <div class="row2">
+            <div class="field"><label>Nombre</label><input type="text" id="otros-newname" placeholder="Ej. Reloj de pared MDF" oninput="checkDuplicate('otros')"></div>
+            <div class="field"><label>Precio ($)</label><input type="number" id="otros-newprice" placeholder="0.00" step="0.5"></div>
+          </div>
+          <div class="suggest-box" id="otros-suggestions"></div>
+          <div id="otros-dupwarn"></div>
+          <div class="actions"><button class="btn ghost small" onclick="addCustomProduct('otros')">+ Agregar a la lista</button></div>
+          <div id="otros-customlist" style="margin-top:14px;"></div>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Impresión</h2>
+          <div class="field"><label>Diseños que caben por hoja</label><input type="number" id="otros-designs" value="1" step="1" min="1"></div>
+          <p class="sub" style="margin-top:-8px;">Usa el costo de hoja de la pestaña <strong>00 · Costos compartidos</strong>.</p>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Tiempo y empaque</h2>
+          <div class="row2">
+            <div class="field"><label>Tiempo de prensado (min)</label><input type="number" id="otros-time" value="4" step="1"></div>
+            <div class="field"><label>Empaque ($)</label><input type="number" id="otros-pack" value="4" step="0.5"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Descuento por volumen del proveedor</h2>
+          <p class="sub">A partir de cuántas piezas el proveedor te da qué % de descuento en el blanco.</p>
+          <table>
+            <thead><tr><th>Desde (pzas)</th><th>Descuento %</th><th></th></tr></thead>
+            <tbody id="otros-tiertable"></tbody>
+          </table>
+          <p class="sub" style="margin-top:-4px;">Esta tabla es propia de la categoría seleccionada arriba — cada una puede tener su propio % de descuento.</p>
+          <div class="actions"><button class="btn ghost small" onclick="addTier(currentOtrosTierKey(),'otros')">+ Agregar rango</button></div>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Margen y mayoreo</h2>
+          <div class="row2">
+            <div class="field"><label>Margen deseado (%)</label><input type="number" id="otros-margin" value="40" step="1"></div>
+            <div class="field"><label>Cantidad para mayoreo</label><input type="number" id="otros-qty" value="12" step="1" oninput="autoFillDiscount(currentOtrosTierKey(),'otros')"></div>
+          </div>
+          <div class="field"><label>Descuento en mayoreo (%)</label><input type="number" id="otros-discount" value="0" step="1" min="0" max="90"></div>
+          <p class="sub" style="margin-top:-8px;">Se rellena solo según la tabla de arriba y la cantidad — puedes ajustarlo a mano si quieres.</p>
+          <div class="actions"><button class="btn" onclick="calcProduct('otros')">Calcular</button></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="results" id="otros-results" style="display:none;">
+          <h2><span class="dot" style="background:var(--ok)"></span>Por pieza</h2>
+          <div class="stat-grid" id="otros-stats-unit"></div>
+          <h2 style="margin-top:20px;"><span class="dot" style="background:var(--ok)"></span>Por mayoreo</h2>
+          <div class="stat-grid" id="otros-stats-bulk"></div>
+          <div class="actions" style="margin-top:14px;">
+            <button class="btn" onclick="addCalcToQuote('otros', otrosQuoteLabel())">+ Agregar a cotización</button>
+          </div>
+          <p class="note-line" id="otros-quote-status"></p>
+        </div>
+        <div class="empty" id="otros-empty">Elige categoría y producto, y pulsa <strong>Calcular</strong>.</div>
+      </div>
+    </div>
+  `;
+}
+
+/* Nombre legible para el renglón de cotización cuando se agrega desde "Otros sublimables". */
+function otrosQuoteLabel(){
+  const cat = document.getElementById('otros-cat') ? document.getElementById('otros-cat').value : 'Otros';
+  const sel = document.getElementById('otros-supplier');
+  const opt = sel && sel.options[sel.selectedIndex];
+  const name = opt ? opt.getAttribute('data-name') : null;
+  return name ? `${cat} — ${name}` : cat;
+}
+
+/* ---------- Panel "Playera / Sudadera DTF" ----------
+   Prenda en blanco + estampado DTF ya hecho por tu proveedor (no lo imprimes tú, así que no usa
+   "diseños por hoja" como las tazas). Bolsa solo aplica en menudeo, igual que Embalaje en los demás,
+   pero con su propio monto porque tú manejas $2 de bolsa en vez de los $7 de Embalaje general.
+   Pasajes sí usa el mismo valor compartido de "00 · Costos compartidos" porque es el mismo costo real. */
+const ROPA_DTF_CONFIGS = [
+  { id:'playeradtf',  title:'Playera + DTF', blankDefault:45,  inkDefault:60, timeDefault:1, packDefault:2, embalajeDefault:2, marginDefault:50, qtyDefault:12 },
+  { id:'sudaderadtf', title:'Sudadera + DTF', blankDefault:140, inkDefault:60, timeDefault:1, packDefault:2, embalajeDefault:2, marginDefault:50, qtyDefault:12 }
+];
+
+function buildRopaDtfCard(cfg){
+  return `
+    <div class="card" style="margin-bottom:24px;">
+      <h2><span class="dot"></span>${cfg.title}</h2>
+      <div class="row2">
+        <div class="field"><label>Costo de la prenda en blanco ($)</label><input type="number" id="${cfg.id}-blank" value="${cfg.blankDefault}" step="0.5"></div>
+        <div class="field"><label>Costo del estampado DTF ($)</label><input type="number" id="${cfg.id}-ink" value="${cfg.inkDefault}" step="0.5"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Tiempo de prensado (min)</label><input type="number" id="${cfg.id}-time" value="${cfg.timeDefault}" step="0.5"></div>
+        <div class="field"><label>Bolsa — solo menudeo ($)</label><input type="number" id="${cfg.id}-embalaje" value="${cfg.embalajeDefault}" step="0.5"></div>
+      </div>
+      <input type="hidden" id="${cfg.id}-pack" value="0">
+      <p class="sub" style="margin-top:-6px;">Los pasajes usan el mismo valor de "00 · Costos compartidos" (ya en $16).</p>
+
+      <h2 style="margin-top:18px;font-size:14px;"><span class="dot"></span>Descuento por volumen</h2>
+      <table>
+        <thead><tr><th>Desde (pzas)</th><th>Descuento %</th><th></th></tr></thead>
+        <tbody id="${cfg.id}-tiertable"></tbody>
+      </table>
+      <div class="actions"><button class="btn ghost small" onclick="addTier('${cfg.id}')">+ Agregar rango</button></div>
+
+      <div class="row2" style="margin-top:14px;">
+        <div class="field"><label>Margen deseado (%)</label><input type="number" id="${cfg.id}-margin" value="${cfg.marginDefault}" step="1"></div>
+        <div class="field"><label>Cantidad para mayoreo</label><input type="number" id="${cfg.id}-qty" value="${cfg.qtyDefault}" step="1" oninput="autoFillDiscount('${cfg.id}')"></div>
+      </div>
+      <div class="field"><label>Descuento en mayoreo (%)</label><input type="number" id="${cfg.id}-discount" value="0" step="1" min="0" max="90"></div>
+      <div class="actions"><button class="btn" onclick="calcProduct('${cfg.id}')">Calcular</button></div>
+
+      <div class="results" id="${cfg.id}-results" style="display:none;margin-top:14px;">
+        <h2 style="font-size:14px;"><span class="dot" style="background:var(--ok)"></span>Por pieza</h2>
+        <div class="stat-grid" id="${cfg.id}-stats-unit"></div>
+        <h2 style="margin-top:14px;font-size:14px;"><span class="dot" style="background:var(--ok)"></span>Por mayoreo</h2>
+        <div class="stat-grid" id="${cfg.id}-stats-bulk"></div>
+        <div class="actions" style="margin-top:14px;">
+          <button class="btn" onclick="addCalcToQuote('${cfg.id}','${escapeAttr(cfg.title)}')">+ Agregar a cotización</button>
+        </div>
+        <p class="note-line" id="${cfg.id}-quote-status"></p>
+      </div>
+      <div class="empty" id="${cfg.id}-empty">Completa los datos y pulsa <strong>Calcular</strong>.</div>
+    </div>
+  `;
+}
+
+function buildRopaDtfPanel(){
+  return `<div>${ROPA_DTF_CONFIGS.map(buildRopaDtfCard).join('')}</div>`;
+}
+
+document.getElementById('panel-ropadtf').innerHTML = buildRopaDtfPanel();
+ROPA_DTF_CONFIGS.forEach(cfg=>{
+  renderDiscountTierTable(cfg.id);
+  autoFillDiscount(cfg.id);
+});
+
+function renderOtrosProducts(){
+  const cat = document.getElementById('otros-cat').value;
+  const items = otrosCatalog[cat] || [];
+  const sel = document.getElementById('otros-supplier');
+  sel.innerHTML = items.map(it => `<option value="${it.price}" data-name="${escapeAttr(it.name)}">${it.name} — $${it.price.toFixed(2)}</option>`).join('');
+  applySupplierPrice('otros');
+  checkDuplicate('otros');
+  renderCustomProductsList('otros');
+  renderDiscountTierTable(currentOtrosTierKey(), 'otros');
+  autoFillDiscount(currentOtrosTierKey(), 'otros');
+}
+
+document.getElementById('panel-otros').innerHTML = buildOtrosPanel();
+renderOtrosProducts();
+
+function calcProduct(id){
+  const blank = parseFloat(document.getElementById(id+'-blank').value) || 0;
+  const designsEl = document.getElementById(id+'-designs');
+  const designs = designsEl ? (parseFloat(designsEl.value) || 1) : 1;
+  const timeMin = parseFloat(document.getElementById(id+'-time').value) || 0;
+  const pack = parseFloat(document.getElementById(id+'-pack').value) || 0;
+  const margin = parseFloat(document.getElementById(id+'-margin').value) || 0;
+  const qty = parseInt(document.getElementById(id+'-qty').value) || 0;
+  const bulkDiscount = parseFloat(document.getElementById(id+'-discount').value) || 0;
+
+  const luzHora = parseFloat(document.getElementById('shared-luz').value) || 0;
+  const laborHora = parseFloat(document.getElementById('shared-labor').value) || 0;
+  const inkEl = document.getElementById(id+'-ink');
+  const hojaCompleta = inkEl ? (parseFloat(inkEl.value) || 0) : (parseFloat(document.getElementById('shared-ink').value) || 0);
+  const embalajeEl = document.getElementById(id+'-embalaje');
+  const embalaje = embalajeEl ? (parseFloat(embalajeEl.value) || 0) : (parseFloat(document.getElementById('shared-embalaje').value) || 0);
+  const pasajes = parseFloat(document.getElementById('shared-pasajes').value) || 0;
+
+  if(blank<=0 || designs<=0){
+    document.getElementById(id+'-results').style.display='none';
+    document.getElementById(id+'-empty').style.display='block';
+    document.getElementById(id+'-empty').innerHTML = '<div class="warn">Revisa el costo del blanco y cuántos diseños caben por hoja.</div>';
+    return;
+  }
+
+  const result = computeProductCost({blank, designs, timeMin, pack, margin, luzHora, laborHora, hojaCompleta, qty, bulkDiscount, roundMode: getRoundMode(), ivaPercent: getIvaPercent(), embalaje, pasajes});
+
+  window.lastCalc = window.lastCalc || {};
+  window.lastCalc[id] = {
+    result, qty,
+    calcInputs: { blank, designs, timeMin, pack, margin, tierKey: (id === 'otros' ? currentOtrosTierKey() : id) }
+  };
+
+  document.getElementById(id+'-empty').style.display='none';
+  document.getElementById(id+'-results').style.display='block';
+
+  document.getElementById(id+'-stats-unit').innerHTML = `
+    <div class="stat"><div class="label">Costo impresión</div><div class="val">$${result.costoImpresion.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Luz + mano de obra</div><div class="val">$${(result.costoLuz+result.costoManoObra).toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Embalaje + pasajes</div><div class="val">$${(result.embalaje+result.pasajes).toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Costo por pieza (menudeo)</div><div class="val accent">$${result.costoMenudeo.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Precio por pieza</div><div class="val ok">$${result.precioUnitario.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Ganancia por pieza</div><div class="val ok">$${result.gananciaUnit.toFixed(2)}</div></div>
+  `;
+  document.getElementById(id+'-stats-bulk').innerHTML = `
+    <div class="stat"><div class="label">Piezas</div><div class="val">${qty}</div></div>
+    <div class="stat"><div class="label">Costo por pieza (mayoreo, sin embalaje/pasajes)</div><div class="val accent">$${result.costoUnitario.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Precio por pieza (mayoreo)</div><div class="val ok">$${result.precioUnitarioMayoreo.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Costo total</div><div class="val">$${result.costoTotal.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Precio total</div><div class="val ok">$${result.precioTotal.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Ganancia total</div><div class="val ok">$${result.gananciaTotal.toFixed(2)}</div></div>
+  `;
+}
+
+/* Redondea SOLO precios de venta, nunca costos. mode viene del select shared-round. */
+function roundPrice(value, mode){
+  if(!mode || mode === 'none') return value;
+  if(mode === '90' || mode === '99'){
+    const cents = mode === '90' ? 0.90 : 0.99;
+    return Math.floor(value) + cents;
+  }
+  const step = parseFloat(mode);
+  if(step > 0) return Math.round(value/step) * step;
+  return value;
+}
+
+/* Motor de cálculo compartido: costo/precio por pieza y por mayoreo.
+   bulkDiscount (%) baja el PRECIO de venta al comprar por mayoreo —
+   el costo del blanco no cambia salvo que tú lo edites a mano.
+   embalaje y pasajes SOLO se cobran en menudeo (pieza suelta) — en mayoreo no se cobran,
+   por eso el costo y el precio de mayoreo son más bajos que los de pieza.
+   ivaPercent (0 si está desactivado) se suma al precio de venta antes de redondear. */
+function computeProductCost({blank, designs, timeMin, pack, margin, luzHora, laborHora, hojaCompleta, qty, bulkDiscount, roundMode, ivaPercent, embalaje, pasajes}){
+  bulkDiscount = bulkDiscount || 0;
+  ivaPercent = ivaPercent || 0;
+  embalaje = embalaje || 0;
+  pasajes = pasajes || 0;
+  const costoImpresion = hojaCompleta / designs;
+  const costoLuz = (timeMin/60) * luzHora;
+  const costoManoObra = (timeMin/60) * laborHora;
+  // Costo de producción: igual sin importar si se vende pieza o mayoreo.
+  const costoUnitario = blank + costoImpresion + costoLuz + costoManoObra + pack;
+  // Costo de menudeo: producción + embalaje + pasajes (solo aplica a pieza suelta).
+  const costoMenudeo = costoUnitario + embalaje + pasajes;
+  let precioUnitario = margin < 100 ? costoMenudeo / (1 - margin/100) : costoMenudeo;
+  precioUnitario = precioUnitario * (1 + ivaPercent/100);
+  precioUnitario = roundPrice(precioUnitario, roundMode);
+  const gananciaUnit = precioUnitario - costoMenudeo;
+
+  let precioUnitarioMayoreo = precioUnitario * (1 - bulkDiscount/100);
+  precioUnitarioMayoreo = roundPrice(precioUnitarioMayoreo, roundMode);
+  const gananciaUnitMayoreo = precioUnitarioMayoreo - costoUnitario;
+  const costoTotal = costoUnitario * qty;
+  const precioTotal = precioUnitarioMayoreo * qty;
+  const gananciaTotal = gananciaUnitMayoreo * qty;
+  const ahorroUnit = precioUnitario - precioUnitarioMayoreo;
+  const ahorroPct = precioUnitario > 0 ? (ahorroUnit / precioUnitario) * 100 : 0;
+  const ahorroTotal = ahorroUnit * qty;
+  return {costoImpresion, costoLuz, costoManoObra, costoUnitario, costoMenudeo, embalaje, pasajes,
+          precioUnitario, gananciaUnit,
+          precioUnitarioMayoreo, gananciaUnitMayoreo, costoTotal, precioTotal, gananciaTotal,
+          ahorroUnit, ahorroPct, ahorroTotal};
+}
+
+function getRoundMode(){
+  const el = document.getElementById('shared-round');
+  return el ? el.value : 'none';
+}
+function getIvaPercent(){
+  const on = document.getElementById('shared-iva-on');
+  const pct = document.getElementById('shared-iva-pct');
+  if(!on || !pct) return 0;
+  return on.checked ? (parseFloat(pct.value) || 0) : 0;
+}
+
+/* ================= LISTA DE PRECIOS GENERAL ================= */
+function buildListaPanel(){
+  return `
+    <div class="card">
+      <h2><span class="dot"></span>Configuración de la lista</h2>
+      <p class="sub">Aplica a todos los productos de esta tabla. Para ajustar un producto específico (diseños por hoja, tiempo, empaque), hazlo en su propia pestaña.</p>
+      <div class="row3">
+        <div class="field"><label>Margen deseado (%)</label><input type="number" id="lista-margin" value="40" step="1" oninput="renderListaTable()"></div>
+        <div class="field"><label>Cantidad para mayoreo</label><input type="number" id="lista-qty" value="12" step="1" oninput="renderListaTable()"></div>
+        <div class="field"><label>Diseños por hoja (default)</label><input type="number" id="lista-designs" value="1" step="1" min="1" oninput="renderListaTable()"></div>
+      </div>
+      <div class="field"><label>Descuento en mayoreo (%)</label><input type="number" id="lista-discount" value="0" step="1" min="0" max="90" oninput="renderListaTable()"></div>
+      <p class="note-line">Tazas 11oz usa 3 diseños por hoja automáticamente; el resto usa el valor de arriba salvo que lo cambies fila por fila más adelante en su propia pestaña.</p>
+      <p class="note-line">El descuento de mayoreo baja el precio de venta por pieza al comprar la cantidad indicada arriba. El costo del blanco no cambia solo (el proveedor no da descuento por volumen en blancos, solo en DTF y hojas de sticker) — si sí te lo da, edítalo tú en la pestaña de ese producto.</p>
+      <p class="note-line">Puedes editar el precio de "Blanco" directo en la tabla de abajo — se guarda solo en este navegador y se usa en toda la app, incluyendo Cotización.</p>
+    </div>
+    <div class="card">
+      <h2><span class="dot"></span>Todos los productos</h2>
+      <div class="field"><label>Buscar producto</label><input type="text" id="lista-search" placeholder="Escribe para filtrar…" oninput="renderListaTable()"></div>
+      <div style="overflow-x:auto;">
+        <table id="lista-table">
+          <thead><tr>
+            <th>Categoría</th><th>Producto</th><th>Blanco</th>
+            <th>Costo/pza</th><th>Precio/pza</th>
+            <th>Costo/pza mayoreo</th><th>Precio/pza mayoreo</th>
+            <th>Costo total mayoreo</th><th>Precio total mayoreo</th>
+          </tr></thead>
+          <tbody id="lista-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+const LISTA_LABELS = {mug:'Tazas', termo:'Termos', playera:'Playeras', gorra:'Gorras', puzzle:'Rompecabezas'};
+
+function renderListaTable(){
+  const margin = parseFloat(document.getElementById('lista-margin').value) || 0;
+  const qty = parseInt(document.getElementById('lista-qty').value) || 0;
+  const designsDefault = parseFloat(document.getElementById('lista-designs').value) || 1;
+  const bulkDiscount = parseFloat(document.getElementById('lista-discount').value) || 0;
+  const searchEl = document.getElementById('lista-search');
+  const search = searchEl ? normalizeName(searchEl.value) : '';
+  const roundMode = getRoundMode();
+  const ivaPercent = getIvaPercent();
+  const laborHora = parseFloat(document.getElementById('shared-labor').value) || 0;
+  const hojaCompleta = parseFloat(document.getElementById('shared-ink').value) || 0;
+  const luzHora = parseFloat(document.getElementById('shared-luz').value) || 0;
+  const embalaje = parseFloat(document.getElementById('shared-embalaje').value) || 0;
+  const pasajes = parseFloat(document.getElementById('shared-pasajes').value) || 0;
+
+  let rows = '';
+
+  productConfigs.forEach(cfg=>{
+    const items = supplierCatalog[cfg.id] || [];
+    const designs = cfg.id === 'mug' ? 3 : designsDefault;
+    items.forEach(it=>{
+      if(search && !normalizeName(it.name).includes(search) && !normalizeName(LISTA_LABELS[cfg.id]).includes(search)) return;
+      const r = computeProductCost({
+        blank: it.price, designs, timeMin: cfg.timeDefault, pack: cfg.packDefault,
+        margin, luzHora, laborHora, hojaCompleta, qty, bulkDiscount, roundMode, ivaPercent, embalaje, pasajes
+      });
+      rows += `<tr>
+        <td>${LISTA_LABELS[cfg.id]}</td><td>${it.name}</td>
+        <td><input type="number" class="price-edit-input" value="${it.price}" step="0.5" min="0" style="width:78px;background:#0d0d10;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:4px 6px;font-size:12px;" onchange="updateCatalogPrice('supplier','${cfg.id}','${escapeAttr(it.name)}', this.value)"></td>
+        <td>$${r.costoMenudeo.toFixed(2)}</td><td>$${r.precioUnitario.toFixed(2)}</td>
+        <td>$${r.costoUnitario.toFixed(2)}</td><td>$${r.precioUnitarioMayoreo.toFixed(2)}</td>
+        <td>$${r.costoTotal.toFixed(2)}</td><td>$${r.precioTotal.toFixed(2)}</td>
+      </tr>`;
+    });
+  });
+
+  Object.keys(otrosCatalog).forEach(cat=>{
+    otrosCatalog[cat].forEach(it=>{
+      if(search && !normalizeName(it.name).includes(search) && !normalizeName(cat).includes(search)) return;
+      const r = computeProductCost({
+        blank: it.price, designs: designsDefault, timeMin: OTROS_DEFAULT.timeDefault, pack: OTROS_DEFAULT.packDefault,
+        margin, luzHora, laborHora, hojaCompleta, qty, bulkDiscount, roundMode, ivaPercent, embalaje, pasajes
+      });
+      rows += `<tr>
+        <td>${cat}</td><td>${it.name}</td>
+        <td><input type="number" class="price-edit-input" value="${it.price}" step="0.5" min="0" style="width:78px;background:#0d0d10;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:4px 6px;font-size:12px;" onchange="updateCatalogPrice('otros','${escapeAttr(cat)}','${escapeAttr(it.name)}', this.value)"></td>
+        <td>$${r.costoMenudeo.toFixed(2)}</td><td>$${r.precioUnitario.toFixed(2)}</td>
+        <td>$${r.costoUnitario.toFixed(2)}</td><td>$${r.precioUnitarioMayoreo.toFixed(2)}</td>
+        <td>$${r.costoTotal.toFixed(2)}</td><td>$${r.precioTotal.toFixed(2)}</td>
+      </tr>`;
+    });
+  });
+
+  document.getElementById('lista-tbody').innerHTML = rows;
+}
+
+document.getElementById('panel-lista').innerHTML = buildListaPanel();
+renderListaTable();
+
+/* ================= COTIZACIÓN DESCARGABLE (imagen tamaño carta) ================= */
+let cotItems = [];
+
+/* Llamada desde el iframe de Almohadas (mismo origen) para agregar
+   una almohada calculada como producto dentro de la cotización actual. */
+function addAlmohadaToCotizacion(payload){
+  const qty = Math.max(1, parseInt(payload.qty) || 1);
+  const priceUnit = parseFloat(payload.precioUnit) || 0;
+  const name = 'Almohada '+payload.ancho+'x'+payload.alto+'cm'+
+    (payload.conRelleno ? ' con relleno' : ' sin relleno')+
+    ' ('+payload.caras+(payload.caras>1?' caras':' cara')+')';
+  cotItems.push({
+    name, qty,
+    priceUnit, priceBulk: priceUnit,
+    savingsPct: 0, savingsUnit: 0, savingsTotal: 0,
+    totalBulk: priceUnit*qty,
+    calcInputs: null
+  });
+  renderCotItems();
+  activateTab('cotizacion');
+  const statusEl = document.getElementById('cot-status');
+  if(statusEl) statusEl.innerHTML = '<span style="color:var(--ok)">Almohada agregada a la cotización — ajusta cantidad si hace falta.</span>';
+}
+
+const QUOTE_COUNTER_KEY = 'sarux_quote_counter';
+const SAVED_QUOTES_KEY = 'sarux_saved_quotes';
+
+function getQuoteCategories(){
+  const cats = [];
+  productConfigs.forEach(cfg=>{
+    cats.push({
+      key: cfg.id, label: LISTA_LABELS[cfg.id], items: supplierCatalog[cfg.id] || [],
+      designs: cfg.id === 'mug' ? 3 : cfg.designsDefault, time: cfg.timeDefault, pack: cfg.packDefault, tierKey: cfg.id
+    });
+  });
+  Object.keys(otrosCatalog).forEach(cat=>{
+    cats.push({
+      key: 'otros::'+cat, label: cat, items: otrosCatalog[cat] || [],
+      designs: OTROS_DEFAULT.designsDefault, time: OTROS_DEFAULT.timeDefault, pack: OTROS_DEFAULT.packDefault, tierKey: 'otros::'+cat
+    });
+  });
+  return cats;
+}
+
+function buildCotizacionPanel(){
+  return `
+    <div class="card">
+      <h2><span class="dot"></span>Datos de la cotización</h2>
+      <div class="row2">
+        <div class="field"><label>Cliente</label><input type="text" id="cot-client" placeholder="Nombre del cliente"></div>
+        <div class="field"><label>Concepto</label><input type="text" id="cot-concept" placeholder="Ej. Playeras para evento X"></div>
+      </div>
+      <div class="field"><label>Margen deseado (%)</label><input type="number" id="cot-margin" value="40" step="1"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot"></span>Agregar producto</h2>
+      <div class="row2">
+        <div class="field"><label>Categoría</label><select id="cot-cat" onchange="renderCotProductSelect()"></select></div>
+        <div class="field"><label>Buscar por nombre</label><input type="text" id="cot-product-filter" placeholder="Escribe para filtrar…" oninput="renderCotProductSelect()"></div>
+      </div>
+      <div class="field"><label>Producto</label><select id="cot-product"></select></div>
+      <div class="field"><label>Cantidad</label><input type="number" id="cot-qty" value="12" step="1"></div>
+      <p class="sub">El descuento de mayoreo se toma de la tabla por volumen de esa categoría, según la cantidad.</p>
+      <div class="actions"><button class="btn ghost small" onclick="addCotItem()">+ Agregar a la cotización</button></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot"></span>Productos de la cotización</h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Producto</th><th>Cant.</th><th>Precio/pza</th><th>Precio mayoreo</th><th>Ahorro</th><th></th></tr></thead>
+          <tbody id="cot-items-tbody"></tbody>
+        </table>
+      </div>
+      <div class="stat-grid" id="cot-totals" style="margin-top:14px;"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot"></span>Términos y condiciones</h2>
+      <textarea id="cot-terms" rows="4" style="width:100%;background:#0d0d10;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 12px;font-family:'Inter',sans-serif;font-size:13px;">Precios sujetos a cambio sin previo aviso. Cotización válida por 15 días. Se requiere el 50% de anticipo para iniciar producción. Tiempo de entrega a confirmar según cantidad y disponibilidad.</textarea>
+    </div>
+
+    <div class="card">
+      <div class="actions"><button class="btn" onclick="previewQuoteImage()">Generar vista previa</button></div>
+      <p class="note-line" id="cot-status"></p>
+    </div>
+
+    <div class="card" id="cot-preview-card" style="display:none;">
+      <h2><span class="dot"></span>Vista previa</h2>
+      <p class="sub">Así se ve la imagen (tamaño carta). Revísala con calma — puedes volver a "Generar vista previa" las veces que quieras sin gastar folio. Cuando esté bien, confírmala.</p>
+      <div class="canvas-wrap">
+        <canvas id="cot-canvas" width="1700" height="2200" style="max-width:100%;height:auto;display:block;"></canvas>
+      </div>
+      <div class="actions" style="margin-top:14px;" id="cot-confirm-actions">
+        <button class="btn" onclick="confirmQuote()">✔ Confirmar cotización (asigna folio)</button>
+      </div>
+      <div class="actions" style="margin-top:14px;display:none;" id="cot-download-actions">
+        <button class="btn" onclick="downloadCurrentQuote()">⬇ Descargar imagen</button>
+        <button class="btn ghost" onclick="downloadCurrentQuotePDF()">⬇ Descargar PDF</button>
+        <button class="btn ghost" onclick="shareCurrentQuoteWhatsapp()">Compartir por WhatsApp</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot"></span>Cotizaciones guardadas</h2>
+      <div id="cot-saved-list"></div>
+    </div>
+  `;
+}
+
+function renderCotCategorySelect(){
+  const sel = document.getElementById('cot-cat');
+  const cats = getQuoteCategories();
+  sel.innerHTML = cats.map(c=>`<option value="${c.key}">${c.label}</option>`).join('');
+  renderCotProductSelect();
+}
+
+function renderCotProductSelect(){
+  const catKey = document.getElementById('cot-cat').value;
+  const cats = getQuoteCategories();
+  const cat = cats.find(c=>c.key===catKey);
+  const sel = document.getElementById('cot-product');
+  if(!cat){ sel.innerHTML=''; return; }
+
+  const filterEl = document.getElementById('cot-product-filter');
+  const filterNorm = filterEl ? normalizeName(filterEl.value) : '';
+  // Sin texto de búsqueda: se ve la lista completa, como antes.
+  // Con texto: se filtra por nombre para encontrarlo más rápido.
+  const items = filterNorm
+    ? cat.items.filter(it => normalizeName(it.name).includes(filterNorm))
+    : cat.items;
+
+  sel.innerHTML = items.length
+    ? items.map(it=>`<option value="${it.price}" data-name="${it.name.replace(/"/g,'&quot;')}">${it.name} — $${it.price.toFixed(2)}</option>`).join('')
+    : '<option value="" disabled selected>Sin coincidencias</option>';
+}
+
+function addCotItem(){
+  const catKey = document.getElementById('cot-cat').value;
+  const cats = getQuoteCategories();
+  const cat = cats.find(c=>c.key===catKey);
+  const prodSel = document.getElementById('cot-product');
+  const opt = prodSel.options[prodSel.selectedIndex];
+  const statusEl = document.getElementById('cot-status');
+  if(!cat || !opt){ return; }
+
+  const name = opt.getAttribute('data-name');
+  const blank = parseFloat(opt.value);
+  if(!name || !(blank>0)){
+    statusEl.innerHTML = '<span style="color:var(--red-bright)">Elige un producto de la lista (revisa tu texto de búsqueda).</span>';
+    return;
+  }
+  const qty = parseInt(document.getElementById('cot-qty').value) || 0;
+  const margin = parseFloat(document.getElementById('cot-margin').value) || 0;
+  if(qty<=0){
+    statusEl.innerHTML = '<span style="color:var(--red-bright)">Pon una cantidad válida.</span>';
+    return;
+  }
+
+  const luzHora = parseFloat(document.getElementById('shared-luz').value) || 0;
+  const laborHora = parseFloat(document.getElementById('shared-labor').value) || 0;
+  const hojaCompleta = parseFloat(document.getElementById('shared-ink').value) || 0;
+  const embalaje = parseFloat(document.getElementById('shared-embalaje').value) || 0;
+  const pasajes = parseFloat(document.getElementById('shared-pasajes').value) || 0;
+  const bulkDiscount = tierDiscountFor(cat.tierKey, qty);
+  const roundMode = getRoundMode();
+  const ivaPercent = getIvaPercent();
+
+  const r = computeProductCost({blank, designs:cat.designs, timeMin:cat.time, pack:cat.pack, margin, luzHora, laborHora, hojaCompleta, qty, bulkDiscount, roundMode, ivaPercent, embalaje, pasajes});
+
+  cotItems.push({
+    name: `${cat.label} — ${name}`,
+    qty,
+    priceUnit: r.precioUnitario,
+    priceBulk: r.precioUnitarioMayoreo,
+    savingsPct: r.ahorroPct,
+    savingsUnit: r.ahorroUnit,
+    savingsTotal: r.ahorroTotal,
+    totalBulk: r.precioTotal,
+    calcInputs: { blank, designs: cat.designs, timeMin: cat.time, pack: cat.pack, margin, tierKey: cat.tierKey }
+  });
+
+  statusEl.innerHTML = '';
+  renderCotItems();
+}
+
+function removeCotItem(i){
+  cotItems.splice(i,1);
+  renderCotItems();
+}
+
+/* Manda a la pestaña de Cotización el resultado que ya está calculado en la pestaña de producto,
+   sin tener que volver a buscarlo en el buscador de Cotización. */
+function addCalcToQuote(id, label){
+  const c = (window.lastCalc || {})[id];
+  const statusId = id+'-quote-status';
+  const statusEl = document.getElementById(statusId);
+  if(!c || !c.result){
+    if(statusEl) statusEl.innerHTML = '<span style="color:var(--red-bright)">Primero pulsa "Calcular" arriba.</span>';
+    return;
+  }
+  const { result, qty, calcInputs } = c;
+  cotItems.push({
+    name: label,
+    qty,
+    priceUnit: result.precioUnitario,
+    priceBulk: result.precioUnitarioMayoreo,
+    savingsPct: result.ahorroPct,
+    savingsUnit: result.ahorroUnit,
+    savingsTotal: result.ahorroTotal,
+    totalBulk: result.precioTotal,
+    calcInputs
+  });
+  renderCotItems();
+  if(statusEl) statusEl.innerHTML = '<span style="color:var(--ok)">✔ Agregado a tu cotización — ve a la pestaña "11 · Cotización" para verlo.</span>';
+}
+
+function updateCotItemQty(i, newQtyStr){
+  const it = cotItems[i];
+  if(!it) return;
+  const qty = parseInt(newQtyStr) || 0;
+  if(qty <= 0){
+    renderCotItems();
+    return;
+  }
+
+  if(it.calcInputs){
+    const {blank, designs, timeMin, pack, margin, tierKey} = it.calcInputs;
+    const luzHora = parseFloat(document.getElementById('shared-luz').value) || 0;
+    const laborHora = parseFloat(document.getElementById('shared-labor').value) || 0;
+    const hojaCompleta = parseFloat(document.getElementById('shared-ink').value) || 0;
+    const embalaje = parseFloat(document.getElementById('shared-embalaje').value) || 0;
+    const pasajes = parseFloat(document.getElementById('shared-pasajes').value) || 0;
+    const bulkDiscount = tierDiscountFor(tierKey, qty);
+    const roundMode = getRoundMode();
+    const ivaPercent = getIvaPercent();
+    const r = computeProductCost({blank, designs, timeMin, pack, margin, luzHora, laborHora, hojaCompleta, qty, bulkDiscount, roundMode, ivaPercent, embalaje, pasajes});
+    it.qty = qty;
+    it.priceUnit = r.precioUnitario;
+    it.priceBulk = r.precioUnitarioMayoreo;
+    it.savingsPct = r.ahorroPct;
+    it.savingsUnit = r.ahorroUnit;
+    it.savingsTotal = r.ahorroTotal;
+    it.totalBulk = r.precioTotal;
+  } else {
+    // Cotización reutilizada de antes de esta actualización: sin datos para recalcular a fondo,
+    // así que solo se escala el total con el precio de mayoreo que ya tenía.
+    it.qty = qty;
+    it.savingsTotal = it.savingsUnit * qty;
+    it.totalBulk = it.priceBulk * qty;
+  }
+  renderCotItems();
+}
+
+function renderCotItems(){
+  const tbody = document.getElementById('cot-items-tbody');
+  tbody.innerHTML = cotItems.length ? cotItems.map((it,i)=>`
+    <tr>
+      <td>${it.name}</td>
+      <td><input type="number" value="${it.qty}" min="1" step="1" style="width:70px;" onchange="updateCotItemQty(${i}, this.value)"></td>
+      <td>$${it.priceUnit.toFixed(2)}</td><td>$${it.priceBulk.toFixed(2)}</td>
+      <td>${it.savingsPct.toFixed(1)}%</td>
+      <td><button class="icon-btn" onclick="removeCotItem(${i})">×</button></td>
+    </tr>`).join('') : `<tr><td colspan="6" class="empty">Aún no agregas productos.</td></tr>`;
+
+  const totalBulk = cotItems.reduce((s,it)=>s+it.totalBulk,0);
+  const totalSavings = cotItems.reduce((s,it)=>s+it.savingsTotal,0);
+  document.getElementById('cot-totals').innerHTML = cotItems.length ? `
+    <div class="stat"><div class="label">Total mayoreo</div><div class="val accent">$${totalBulk.toFixed(2)}</div></div>
+    <div class="stat"><div class="label">Ahorro total del cliente</div><div class="val ok">$${totalSavings.toFixed(2)}</div></div>
+  ` : '';
+}
+
+function nextQuoteNumber(){
+  let n = parseInt(localStorage.getItem(QUOTE_COUNTER_KEY) || '0', 10) + 1;
+  try{ localStorage.setItem(QUOTE_COUNTER_KEY, String(n)); }catch(e){}
+  return n;
+}
+function loadSavedQuotes(){
+  try{ return JSON.parse(localStorage.getItem(SAVED_QUOTES_KEY) || '[]'); }catch(e){ return []; }
+}
+function saveSavedQuotesList(list){
+  try{ localStorage.setItem(SAVED_QUOTES_KEY, JSON.stringify(list)); }catch(e){ console.error('No se pudo guardar la cotización', e); }
+}
+
+let currentQuoteData = null;
+
+/* "Generar vista previa" SOLO dibuja el canvas — no gasta folio ni guarda nada.
+   Puedes darle tantas veces como quieras (para corregir erratas, etc.) sin costo. */
+async function previewQuoteImage(){
+  const client = (document.getElementById('cot-client').value||'').trim();
+  const concept = (document.getElementById('cot-concept').value||'').trim();
+  const terms = document.getElementById('cot-terms').value || '';
+  const statusEl = document.getElementById('cot-status');
+
+  if(!client){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Escribe el nombre del cliente antes de generar.</span>'; return; }
+  if(cotItems.length===0){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Agrega al menos un producto a la cotización.</span>'; return; }
+
+  const now = new Date();
+  const totalBulk = cotItems.reduce((s,it)=>s+it.totalBulk,0);
+  const totalSavings = cotItems.reduce((s,it)=>s+it.savingsTotal,0);
+
+  const quoteData = {
+    number: null, dateISO: now.toISOString(), client, concept,
+    items: cotItems.map(it=>({...it})),
+    totalBulk, totalSavings, terms, confirmed: false
+  };
+  currentQuoteData = quoteData;
+
+  statusEl.innerHTML = 'Generando vista previa…';
+  await drawQuoteToCanvas(quoteData);
+
+  document.getElementById('cot-preview-card').style.display = 'block';
+  document.getElementById('cot-confirm-actions').style.display = 'block';
+  document.getElementById('cot-download-actions').style.display = 'none';
+  statusEl.innerHTML = '<span style="color:var(--ok)">Vista previa lista (sin folio) — revísala y pulsa "Confirmar" para asignarle folio y guardarla.</span>';
+  document.getElementById('cot-preview-card').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+/* "Confirmar cotización" es lo único que gasta un folio y guarda la entrada.
+   Si ya estaba confirmada (no has vuelto a generar una vista previa), no hace nada nuevo. */
+async function confirmQuote(){
+  const statusEl = document.getElementById('cot-status');
+  if(!currentQuoteData){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Primero genera una vista previa.</span>'; return; }
+  if(currentQuoteData.confirmed){
+    statusEl.innerHTML = `<span style="color:var(--ok)">Ya estaba confirmada como COT-${String(currentQuoteData.number).padStart(4,'0')}.</span>`;
+    return;
+  }
+
+  const number = nextQuoteNumber();
+  currentQuoteData.number = number;
+  currentQuoteData.dateISO = new Date().toISOString();
+  currentQuoteData.confirmed = true;
+
+  const saved = loadSavedQuotes();
+  saved.unshift(currentQuoteData);
+  saveSavedQuotesList(saved.slice(0,50));
+  renderSavedQuotesList();
+
+  await drawQuoteToCanvas(currentQuoteData);
+  document.getElementById('cot-download-actions').style.display = 'block';
+  statusEl.innerHTML = `<span style="color:var(--ok)">Cotización COT-${String(number).padStart(4,'0')} confirmada y guardada.</span>`;
+}
+
+function downloadCurrentQuote(){
+  if(!currentQuoteData || !currentQuoteData.confirmed) return;
+  downloadCanvasAsImage(`cotizacion-${String(currentQuoteData.number).padStart(4,'0')}-${currentQuoteData.client.replace(/\s+/g,'_')}.png`);
+}
+
+/* jsPDF se carga solo hasta que se necesita (al pedir el PDF), no al abrir la página,
+   para que una librería externa lenta o bloqueada nunca congele el resto de la app. */
+function loadJsPDF(){
+  if(window.jspdf) return Promise.resolve();
+  if(loadJsPDF._promise) return loadJsPDF._promise;
+  loadJsPDF._promise = new Promise((resolve, reject)=>{
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload = ()=>resolve();
+    s.onerror = ()=>{ loadJsPDF._promise = null; reject(new Error('No se pudo cargar jsPDF')); };
+    document.head.appendChild(s);
+  });
+  return loadJsPDF._promise;
+}
+
+async function downloadCurrentQuotePDF(){
+  if(!currentQuoteData || !currentQuoteData.confirmed) return;
+  const canvas = document.getElementById('cot-canvas');
+  const filename = `cotizacion-${String(currentQuoteData.number).padStart(4,'0')}-${currentQuoteData.client.replace(/\s+/g,'_')}.pdf`;
+  const statusEl = document.getElementById('cot-status');
+  try{
+    if(statusEl) statusEl.innerHTML = 'Preparando el PDF…';
+    await loadJsPDF();
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit:'in', format:'letter' });
+    const imgData = canvas.toDataURL('image/png');
+    pdf.addImage(imgData, 'PNG', 0, 0, 8.5, 11);
+    pdf.save(filename);
+    if(statusEl) statusEl.innerHTML = '<span style="color:var(--ok)">PDF descargado.</span>';
+  }catch(e){
+    console.error('No se pudo generar el PDF', e);
+    if(statusEl) statusEl.innerHTML = '<span style="color:var(--red-bright)">No se pudo generar el PDF — revisa tu conexión e intenta de nuevo.</span>';
+  }
+}
+
+async function shareCurrentQuoteWhatsapp(){
+  if(!currentQuoteData || !currentQuoteData.confirmed) return;
+  const canvas = document.getElementById('cot-canvas');
+  const filename = `cotizacion-${String(currentQuoteData.number).padStart(4,'0')}-${currentQuoteData.client.replace(/\s+/g,'_')}.png`;
+
+  canvas.toBlob(async (blob)=>{
+    const file = new File([blob], filename, {type:'image/png'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({
+          files:[file],
+          title: 'Cotización SARUX',
+          text: `Cotización COT-${String(currentQuoteData.number).padStart(4,'0')} para ${currentQuoteData.client}`
+        });
+        return;
+      }catch(e){ /* el usuario canceló o no se pudo, cae al respaldo de abajo */ }
+    }
+    // Respaldo: no se puede adjuntar imagen directo — se descarga y se abre WhatsApp con el texto
+    downloadCanvasAsImage(filename);
+    const text = encodeURIComponent(`Cotización COT-${String(currentQuoteData.number).padStart(4,'0')} para ${currentQuoteData.client} — te comparto la imagen que se acaba de descargar.`);
+    window.open(`https://wa.me/?text=${text}`, '_blank');
+  }, 'image/png');
+}
+
+function downloadCanvasAsImage(filename){
+  const canvas = document.getElementById('cot-canvas');
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = canvas.toDataURL('image/png');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight){
+  const words = (text||'').split(' ');
+  let line = '';
+  let curY = y;
+  for(let n=0;n<words.length;n++){
+    const testLine = line + words[n] + ' ';
+    const width = ctx.measureText(testLine).width;
+    if(width > maxWidth && n>0){
+      ctx.fillText(line, x, curY);
+      line = words[n]+' ';
+      curY += lineHeight;
+    } else {
+      line = testLine;
+    }
+  }
+  ctx.fillText(line, x, curY);
+  return curY + lineHeight;
+}
+
+function loadImagePromise(src){
+  return new Promise((resolve)=>{
+    const img = new Image();
+    img.onload = ()=>resolve(img);
+    img.onerror = ()=>resolve(null);
+    img.src = src;
+  });
+}
+
+async function drawQuoteToCanvas(q){
+  const canvas = document.getElementById('cot-canvas');
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0,0,W,H);
+
+  const M = 90;
+  let y = M;
+
+  const logoDataUrl = localStorage.getItem(LOGO_KEY);
+  const logoImg = logoDataUrl ? await loadImagePromise(logoDataUrl) : null;
+
+  ctx.textAlign = 'left';
+  if(logoImg){
+    const maxLogoH = 90, maxLogoW = 320;
+    let lw = logoImg.width, lh = logoImg.height;
+    const scale = Math.min(maxLogoW/lw, maxLogoH/lh, 1);
+    lw *= scale; lh *= scale;
+    ctx.drawImage(logoImg, M, y, lw, lh);
+  } else {
+    ctx.fillStyle = '#0a0a0c';
+    ctx.font = "700 54px 'Space Grotesk', sans-serif";
+    ctx.fillText('SARUX', M, y+40);
+    ctx.font = "400 18px 'JetBrains Mono', monospace";
+    ctx.fillStyle = '#888';
+    ctx.fillText('Diseño y sublimación', M, y+68);
+  }
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#c81e3a';
+  ctx.font = "600 24px 'JetBrains Mono', monospace";
+  ctx.fillText('COTIZACIÓN', W-M, y+10);
+  ctx.font = "500 20px 'JetBrains Mono', monospace";
+  ctx.fillStyle = '#444';
+  ctx.fillText(q.number ? ('COT-'+String(q.number).padStart(4,'0')) : 'BORRADOR — sin folio', W-M, y+38);
+  const d = new Date(q.dateISO);
+  const fecha = d.toLocaleDateString('es-MX', {year:'numeric', month:'long', day:'numeric'});
+  const hora = d.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'});
+  ctx.fillText(fecha+' · '+hora, W-M, y+64);
+
+  const contactPhone = (localStorage.getItem(COT_PHONE_KEY) || '').trim();
+  if(contactPhone){
+    ctx.font = "500 20px 'JetBrains Mono', monospace";
+    ctx.fillStyle = '#0a0a0c';
+    ctx.fillText(contactPhone, W-M, y+90);
+  }
+  ctx.textAlign = 'left';
+
+  y += 110;
+  ctx.strokeStyle = '#c81e3a';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(M,y); ctx.lineTo(W-M,y); ctx.stroke();
+
+  y += 50;
+  ctx.fillStyle = '#0a0a0c';
+  ctx.font = "600 26px 'Inter', sans-serif";
+  ctx.fillText('Cliente: '+q.client, M, y);
+  y += 38;
+  if(q.concept){
+    ctx.font = "400 22px 'Inter', sans-serif";
+    ctx.fillStyle = '#333';
+    y = wrapCanvasText(ctx, 'Concepto: '+q.concept, M, y, W-2*M, 30);
+  }
+
+  y += 26;
+  const colX = [M, M+700, M+950, M+1220, M+1470];
+  ctx.fillStyle = '#0a0a0c';
+  ctx.fillRect(M, y, W-2*M, 50);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = "600 19px 'JetBrains Mono', monospace";
+  ctx.fillText('PRODUCTO', colX[0]+16, y+33);
+  ctx.fillText('CANT.', colX[1], y+33);
+  ctx.fillText('P/PZA', colX[2], y+33);
+  ctx.fillText('P/MAYOREO', colX[3], y+33);
+  ctx.fillText('AHORRO', colX[4], y+33);
+  y += 50;
+
+  const tableTop = y;
+  const maxTableHeight = 900;
+  const rowH = Math.max(32, Math.min(58, Math.floor(maxTableHeight / Math.max(q.items.length,1))));
+  const nameFont = rowH < 40 ? "400 16px 'Inter', sans-serif" : "400 19px 'Inter', sans-serif";
+
+  q.items.forEach((it,i)=>{
+    if(i % 2 === 1){
+      ctx.fillStyle = '#f4f2ef';
+      ctx.fillRect(M, y, W-2*M, rowH);
+    }
+    ctx.font = nameFont;
+    ctx.fillStyle = '#0a0a0c';
+    const maxChars = rowH < 40 ? 50 : 44;
+    const name = it.name.length > maxChars ? it.name.slice(0,maxChars-1)+'…' : it.name;
+    ctx.fillText(name, colX[0]+16, y+rowH/2+7);
+    ctx.fillText(String(it.qty), colX[1], y+rowH/2+7);
+    ctx.fillText('$'+it.priceUnit.toFixed(2), colX[2], y+rowH/2+7);
+    ctx.fillStyle = '#c81e3a';
+    ctx.fillText('$'+it.priceBulk.toFixed(2), colX[3], y+rowH/2+7);
+    ctx.fillStyle = '#1f8a4c';
+    ctx.fillText(it.savingsPct.toFixed(0)+'%', colX[4], y+rowH/2+7);
+    y += rowH;
+  });
+
+  y += 24;
+  ctx.strokeStyle = '#ddd';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(M,y); ctx.lineTo(W-M,y); ctx.stroke();
+  y += 50;
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#333';
+  ctx.font = "500 22px 'Inter', sans-serif";
+  ctx.fillText('Total mayoreo:', W-M-260, y);
+  ctx.font = "700 30px 'Space Grotesk', sans-serif";
+  ctx.fillStyle = '#0a0a0c';
+  ctx.fillText('$'+q.totalBulk.toFixed(2), W-M, y);
+  y += 44;
+  ctx.font = "500 22px 'Inter', sans-serif";
+  ctx.fillStyle = '#1f8a4c';
+  ctx.fillText('Ahorras en total:', W-M-260, y);
+  ctx.font = "700 30px 'Space Grotesk', sans-serif";
+  ctx.fillText('$'+q.totalSavings.toFixed(2), W-M, y);
+  ctx.textAlign = 'left';
+
+  y = Math.max(y+90, tableTop + q.items.length*rowH + 200);
+  y = Math.min(y, H - 260);
+  ctx.fillStyle = '#0a0a0c';
+  ctx.font = "600 22px 'Inter', sans-serif";
+  ctx.fillText('Términos y condiciones', M, y);
+  y += 32;
+  ctx.font = "400 18px 'Inter', sans-serif";
+  ctx.fillStyle = '#555';
+  wrapCanvasText(ctx, q.terms || '', M, y, W-2*M, 26);
+
+  ctx.fillStyle = '#999';
+  ctx.font = "400 16px 'JetBrains Mono', monospace";
+  ctx.fillText('Generado el '+new Date().toLocaleString('es-MX'), M, H-M+10);
+}
+
+function renderSavedQuotesList(){
+  const container = document.getElementById('cot-saved-list');
+  const saved = loadSavedQuotes();
+  if(saved.length === 0){
+    container.innerHTML = '<p class="empty">Aún no generas ninguna.</p>';
+    return;
+  }
+  container.innerHTML = saved.slice(0,20).map((q,i)=>{
+    const d = new Date(q.dateISO);
+    return `<div class="stat" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:12px;flex-wrap:wrap;">
+      <div>
+        <div class="label">COT-${String(q.number).padStart(4,'0')} · ${d.toLocaleDateString('es-MX')}</div>
+        <div class="val" style="font-size:15px;">${q.client} — $${q.totalBulk.toFixed(2)}</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn ghost small" onclick="reuseSavedQuote(${i})">Reutilizar</button>
+        <button class="btn ghost small" onclick="redownloadQuote(${i})">Descargar de nuevo</button>
+        <button class="icon-btn" onclick="deleteSavedQuote(${i})" title="Borrar">×</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function deleteSavedQuote(i){
+  const saved = loadSavedQuotes();
+  if(!saved[i]) return;
+  saved.splice(i,1);
+  saveSavedQuotesList(saved);
+  renderSavedQuotesList();
+}
+
+function reuseSavedQuote(i){
+  const saved = loadSavedQuotes();
+  const q = saved[i];
+  if(!q) return;
+
+  document.getElementById('cot-client').value = q.client || '';
+  document.getElementById('cot-concept').value = q.concept || '';
+  document.getElementById('cot-terms').value = q.terms || '';
+  cotItems = q.items.map(it=>({...it}));
+  renderCotItems();
+
+  document.getElementById('cot-status').innerHTML = '<span style="color:var(--ok)">Cotización COT-'+String(q.number).padStart(4,'0')+' cargada — ajústala y pulsa "Generar vista previa" para crear una nueva.</span>';
+  document.getElementById('panel-cotizacion').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+async function redownloadQuote(i){
+  const saved = loadSavedQuotes();
+  const q = saved[i];
+  if(!q) return;
+  q.confirmed = true; // ya tiene folio asignado desde que se guardó
+  currentQuoteData = q;
+  await drawQuoteToCanvas(q);
+  document.getElementById('cot-preview-card').style.display = 'block';
+  document.getElementById('cot-confirm-actions').style.display = 'none';
+  document.getElementById('cot-download-actions').style.display = 'block';
+  downloadCanvasAsImage(`cotizacion-${String(q.number).padStart(4,'0')}-${q.client.replace(/\s+/g,'_')}.png`);
+}
+
+document.getElementById('panel-cotizacion').innerHTML = buildCotizacionPanel();
+renderCotCategorySelect();
+renderCotItems();
+renderSavedQuotesList();
+
+renderLogoPreview();
+renderCotPhonePreview();
+buildCentralTiersGrid();
+
+
+
+
+/* ---------- Almohadas (contenido original embebido tal cual) ---------- */
+const almohadasHTML = "<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Calculadora de Almohadas<\/title>\n<link href=\"https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap\" rel=\"stylesheet\">\n<style>\n  :root {\n    --cream: #FAF6F0;\n    --warm: #F0E8DC;\n    --accent: #C4773B;\n    --accent-dark: #9A5A28;\n    --dark: #2C1F14;\n    --mid: #7A6555;\n    --light-border: #E2D5C3;\n    --green: #4A7C59;\n    --red: #C0392B;\n  }\n\n  * { margin: 0; padding: 0; box-sizing: border-box; }\n\n  body {\n    background: var(--cream);\n    font-family: 'DM Sans', sans-serif;\n    color: var(--dark);\n    min-height: 100vh;\n    padding: 24px 16px 60px;\n  }\n\n  header {\n    text-align: center;\n    margin-bottom: 32px;\n    padding-bottom: 24px;\n    border-bottom: 1.5px solid var(--light-border);\n  }\n\n  header h1 {\n    font-family: 'Playfair Display', serif;\n    font-size: 2rem;\n    color: var(--dark);\n    letter-spacing: -0.5px;\n  }\n\n  header p {\n    color: var(--mid);\n    font-size: 0.85rem;\n    margin-top: 6px;\n    font-weight: 300;\n  }\n\n  .pill {\n    display: inline-block;\n    background: var(--accent);\n    color: white;\n    font-size: 0.7rem;\n    font-weight: 500;\n    padding: 3px 10px;\n    border-radius: 20px;\n    margin-bottom: 10px;\n    letter-spacing: 1px;\n    text-transform: uppercase;\n  }\n\n  .section {\n    background: white;\n    border: 1.5px solid var(--light-border);\n    border-radius: 16px;\n    padding: 22px 20px;\n    margin-bottom: 16px;\n  }\n\n  .section-title {\n    font-family: 'Playfair Display', serif;\n    font-size: 1.05rem;\n    color: var(--accent-dark);\n    margin-bottom: 16px;\n    display: flex;\n    align-items: center;\n    gap: 8px;\n  }\n\n  .section-title::before {\n    content: '';\n    display: block;\n    width: 4px;\n    height: 18px;\n    background: var(--accent);\n    border-radius: 2px;\n  }\n\n  label {\n    display: block;\n    font-size: 0.8rem;\n    font-weight: 500;\n    color: var(--mid);\n    margin-bottom: 6px;\n    text-transform: uppercase;\n    letter-spacing: 0.5px;\n  }\n\n  input[type=\"number\"], input[type=\"text\"] {\n    width: 100%;\n    border: 1.5px solid var(--light-border);\n    border-radius: 10px;\n    padding: 11px 14px;\n    font-size: 0.95rem;\n    font-family: 'DM Sans', sans-serif;\n    color: var(--dark);\n    background: var(--cream);\n    transition: border-color 0.2s;\n    -moz-appearance: textfield;\n  }\n\n  input[type=\"number\"]::-webkit-inner-spin-button { -webkit-appearance: none; }\n\n  input:focus {\n    outline: none;\n    border-color: var(--accent);\n    background: white;\n  }\n\n  .input-group {\n    margin-bottom: 14px;\n  }\n\n  .input-row {\n    display: grid;\n    grid-template-columns: 1fr 1fr;\n    gap: 12px;\n  }\n\n  .input-suffix {\n    position: relative;\n  }\n\n  .input-suffix input {\n    padding-right: 40px;\n  }\n\n  .input-suffix span {\n    position: absolute;\n    right: 13px;\n    top: 50%;\n    transform: translateY(-50%);\n    color: var(--mid);\n    font-size: 0.85rem;\n    pointer-events: none;\n  }\n\n  /* Toggle switches */\n  .toggle-group {\n    display: grid;\n    grid-template-columns: 1fr 1fr;\n    gap: 10px;\n    margin-bottom: 14px;\n  }\n\n  .toggle-btn {\n    border: 1.5px solid var(--light-border);\n    background: var(--cream);\n    border-radius: 10px;\n    padding: 12px 8px;\n    text-align: center;\n    font-size: 0.82rem;\n    font-family: 'DM Sans', sans-serif;\n    color: var(--mid);\n    cursor: pointer;\n    transition: all 0.2s;\n    font-weight: 500;\n  }\n\n  .toggle-btn.active {\n    border-color: var(--accent);\n    background: var(--accent);\n    color: white;\n  }\n\n  /* Costos fijos editables */\n  .costos-grid {\n    display: grid;\n    grid-template-columns: 1fr 1fr;\n    gap: 12px;\n  }\n\n  .costo-item label {\n    font-size: 0.75rem;\n  }\n\n  /* Resultado */\n  .resultado {\n    background: var(--dark);\n    border-radius: 16px;\n    padding: 24px 20px;\n    margin-top: 20px;\n    color: white;\n  }\n\n  .resultado-title {\n    font-family: 'Playfair Display', serif;\n    font-size: 1.1rem;\n    margin-bottom: 20px;\n    color: #E8D5C0;\n    text-align: center;\n  }\n\n  .desglose {\n    margin-bottom: 20px;\n  }\n\n  .desglose-item {\n    display: flex;\n    justify-content: space-between;\n    align-items: center;\n    padding: 8px 0;\n    border-bottom: 1px solid rgba(255,255,255,0.08);\n    font-size: 0.85rem;\n  }\n\n  .desglose-item:last-child {\n    border-bottom: none;\n  }\n\n  .desglose-item .name {\n    color: #B8A898;\n    font-weight: 300;\n  }\n\n  .desglose-item .value {\n    font-weight: 500;\n    color: white;\n  }\n\n  .totales {\n    background: rgba(255,255,255,0.07);\n    border-radius: 12px;\n    padding: 16px;\n  }\n\n  .total-row {\n    display: flex;\n    justify-content: space-between;\n    align-items: center;\n    margin-bottom: 10px;\n  }\n\n  .total-row:last-child { margin-bottom: 0; }\n\n  .total-row .label {\n    font-size: 0.8rem;\n    color: #B8A898;\n    text-transform: uppercase;\n    letter-spacing: 0.5px;\n  }\n\n  .total-row .amount {\n    font-size: 1.1rem;\n    font-weight: 500;\n  }\n\n  .total-row.venta .amount {\n    font-family: 'Playfair Display', serif;\n    font-size: 1.6rem;\n    color: #F4C06F;\n  }\n\n  .margen-section {\n    margin-top: 16px;\n    padding-top: 16px;\n    border-top: 1px solid rgba(255,255,255,0.1);\n  }\n\n  .margen-section label {\n    color: #B8A898;\n    font-size: 0.75rem;\n    margin-bottom: 8px;\n  }\n\n  .margen-slider {\n    width: 100%;\n    -webkit-appearance: none;\n    height: 4px;\n    border-radius: 2px;\n    background: rgba(255,255,255,0.2);\n    outline: none;\n    margin-bottom: 6px;\n  }\n\n  .margen-slider::-webkit-slider-thumb {\n    -webkit-appearance: none;\n    width: 18px;\n    height: 18px;\n    border-radius: 50%;\n    background: var(--accent);\n    cursor: pointer;\n  }\n\n  .margen-display {\n    text-align: right;\n    font-size: 0.85rem;\n    color: #F4C06F;\n    font-weight: 500;\n  }\n\n  .btn-calcular {\n    width: 100%;\n    background: var(--accent);\n    color: white;\n    border: none;\n    border-radius: 12px;\n    padding: 16px;\n    font-size: 1rem;\n    font-family: 'Playfair Display', serif;\n    cursor: pointer;\n    margin-top: 16px;\n    transition: background 0.2s, transform 0.1s;\n    letter-spacing: 0.5px;\n  }\n\n  .btn-calcular:active {\n    transform: scale(0.98);\n    background: var(--accent-dark);\n  }\n\n  .note {\n    font-size: 0.75rem;\n    color: var(--mid);\n    margin-top: 6px;\n    font-style: italic;\n  }\n\n  .divider {\n    border: none;\n    border-top: 1.5px solid var(--light-border);\n    margin: 20px 0;\n  }\n<\/style>\n<\/head>\n<body>\n\n<header>\n  <div class=\"pill\">\u2726 Sublimaci\u00f3n<\/div>\n  <h1>Calculadora de Almohadas<\/h1>\n  <p>Calcula tu costo de fabricaci\u00f3n y precio de venta<\/p>\n<\/header>\n\n<!-- MEDIDAS -->\n<div class=\"section\">\n  <div class=\"section-title\">Medidas de la almohada<\/div>\n  <div class=\"input-row\">\n    <div class=\"input-group\">\n      <label>Ancho (cm)<\/label>\n      <div class=\"input-suffix\">\n        <input type=\"number\" id=\"ancho\" value=\"40\" min=\"1\" oninput=\"calcular()\">\n        <span>cm<\/span>\n      <\/div>\n    <\/div>\n    <div class=\"input-group\">\n      <label>Alto (cm)<\/label>\n      <div class=\"input-suffix\">\n        <input type=\"number\" id=\"alto\" value=\"40\" min=\"1\" oninput=\"calcular()\">\n        <span>cm<\/span>\n      <\/div>\n    <\/div>\n  <\/div>\n  <p class=\"note\">* El ancho de la tela es siempre 150 cm<\/p>\n<\/div>\n\n<!-- OPCIONES -->\n<div class=\"section\">\n  <div class=\"section-title\">Opciones<\/div>\n\n  <div class=\"input-group\">\n    <label>\u00bfLleva relleno?<\/label>\n    <div class=\"toggle-group\">\n      <button class=\"toggle-btn active\" id=\"btn-relleno-si\" onclick=\"setRelleno(true)\">\u2714 Con relleno<\/button>\n      <button class=\"toggle-btn\" id=\"btn-relleno-no\" onclick=\"setRelleno(false)\">\u2716 Sin relleno<\/button>\n    <\/div>\n  <\/div>\n\n  <div class=\"input-group\">\n    <label>Impresi\u00f3n<\/label>\n    <div class=\"toggle-group\">\n      <button class=\"toggle-btn active\" id=\"btn-1cara\" onclick=\"setCaras(1)\">1 cara<\/button>\n      <button class=\"toggle-btn\" id=\"btn-2caras\" onclick=\"setCaras(2)\">2 caras<\/button>\n    <\/div>\n  <\/div>\n<\/div>\n\n<!-- COSTOS EDITABLES -->\n<div class=\"section\">\n  <div class=\"section-title\">Costos base (editables)<\/div>\n  <div class=\"costos-grid\">\n    <div class=\"costo-item input-group\">\n      <label>Tela ($/metro)<\/label>\n      <div class=\"input-suffix\">\n        <input type=\"number\" id=\"precio-tela\" value=\"30\" min=\"0\" step=\"0.5\" oninput=\"calcular()\">\n        <span>$<\/span>\n      <\/div>\n    <\/div>\n    <div class=\"costo-item input-group\">\n      <label>Relleno ($/kilo)<\/label>\n      <div class=\"input-suffix\">\n        <input type=\"number\" id=\"precio-relleno\" value=\"60\" min=\"0\" step=\"0.5\" oninput=\"calcular()\">\n        <span>$<\/span>\n      <\/div>\n    <\/div>\n    <div class=\"costo-item input-group\">\n      <label>Luz (fijo)<\/label>\n      <div class=\"input-suffix\">\n        <input type=\"number\" id=\"precio-luz\" value=\"3\" min=\"0\" step=\"0.5\" oninput=\"calcular()\">\n        <span>$<\/span>\n      <\/div>\n    <\/div>\n    <div class=\"costo-item input-group\">\n      <label>Costura (fijo)<\/label>\n      <div class=\"input-suffix\">\n        <input type=\"number\" id=\"precio-costura\" value=\"2\" min=\"0\" step=\"0.5\" oninput=\"calcular()\">\n        <span>$<\/span>\n      <\/div>\n    <\/div>\n    <div class=\"costo-item input-group\" style=\"grid-column: span 2;\">\n      <label>Impresi\u00f3n A4 (base $)<\/label>\n      <div class=\"input-suffix\">\n        <input type=\"number\" id=\"precio-impresion\" value=\"12\" min=\"0\" step=\"0.5\" oninput=\"calcular()\">\n        <span>$<\/span>\n      <\/div>\n      <p class=\"note\">* Se escala proporcionalmente al tama\u00f1o de la almohada<\/p>\n    <\/div>\n  <\/div>\n<\/div>\n\n<!-- RESULTADO -->\n<div class=\"resultado\">\n  <div class=\"resultado-title\">\ud83d\udcca Resumen de costos<\/div>\n\n  <div class=\"desglose\">\n    <div class=\"desglose-item\">\n      <span class=\"name\">\ud83e\uddf5 Tela (<span id=\"d-tela-m\">\u2014<\/span> m\u00b2)<\/span>\n      <span class=\"value\" id=\"d-tela\">$0.00<\/span>\n    <\/div>\n    <div class=\"desglose-item\" id=\"fila-relleno\">\n      <span class=\"name\">\ud83e\udeb6 Relleno (<span id=\"d-relleno-g\">\u2014<\/span> g)<\/span>\n      <span class=\"value\" id=\"d-relleno\">$0.00<\/span>\n    <\/div>\n    <div class=\"desglose-item\">\n      <span class=\"name\">\ud83d\udda8\ufe0f Impresi\u00f3n (<span id=\"d-caras\">1 cara<\/span>)<\/span>\n      <span class=\"value\" id=\"d-impresion\">$0.00<\/span>\n    <\/div>\n    <div class=\"desglose-item\">\n      <span class=\"name\">\ud83d\udca1 Luz<\/span>\n      <span class=\"value\" id=\"d-luz\">$3.00<\/span>\n    <\/div>\n    <div class=\"desglose-item\">\n      <span class=\"name\">\ud83e\udea1 Costura<\/span>\n      <span class=\"value\" id=\"d-costura\">$2.00<\/span>\n    <\/div>\n  <\/div>\n\n  <div class=\"totales\">\n    <div class=\"total-row\">\n      <span class=\"label\">Costo de fabricaci\u00f3n<\/span>\n      <span class=\"amount\" id=\"costo-fab\">$0.00<\/span>\n    <\/div>\n\n    <div class=\"margen-section\">\n      <label>MARGEN DE GANANCIA<\/label>\n      <input type=\"range\" class=\"margen-slider\" id=\"margen\" min=\"10\" max=\"200\" value=\"50\" oninput=\"actualizarMargen()\">\n      <div class=\"margen-display\" id=\"margen-display\">50%<\/div>\n    <\/div>\n\n    <hr style=\"border:none; border-top:1px solid rgba(255,255,255,0.1); margin: 14px 0;\">\n\n    <div class=\"total-row venta\">\n      <span class=\"label\">\ud83d\udcb0 Precio de venta<\/span>\n      <span class=\"amount\" id=\"precio-venta\">$0.00<\/span>\n    <\/div>\n  <\/div>\n<\/div>\n\n<!-- AGREGAR A COTIZACI\u00d3N -->\n<div class=\"section\">\n  <div class=\"section-title\">Agregar a una cotizaci\u00f3n<\/div>\n  <div class=\"input-group\">\n    <label>Cantidad<\/label>\n    <input type=\"number\" id=\"almohada-qty\" value=\"1\" min=\"1\" step=\"1\">\n  <\/div>\n  <button class=\"btn-calcular\" onclick=\"agregarACotizacion()\">+ Agregar esta almohada a la cotizaci\u00f3n<\/button>\n  <p class=\"note\" id=\"almohada-add-status\" style=\"margin-top:10px;\"><\/p>\n<\/div>\n\n<script>\n  let conRelleno = true;\n  let caras = 1;\n  let ultimoCostoFab = 0;\n  let ultimoPrecioVenta = 0;\n\n  // Guarda y restaura los costos base (tela, relleno, luz, costura, impresi\u00f3n, margen)\n  // en este navegador, para que no se reseteen cada vez que recargas la p\u00e1gina.\n  const ALMOHADAS_SETTINGS_KEY = 'sarux_almohadas_settings_v1';\n  function guardarCostosAlmohadas() {\n    try {\n      const s = {\n        tela: document.getElementById('precio-tela').value,\n        relleno: document.getElementById('precio-relleno').value,\n        luz: document.getElementById('precio-luz').value,\n        costura: document.getElementById('precio-costura').value,\n        impresion: document.getElementById('precio-impresion').value,\n        margen: document.getElementById('margen').value\n      };\n      localStorage.setItem(ALMOHADAS_SETTINGS_KEY, JSON.stringify(s));\n    } catch (e) { console.error('No se pudieron guardar los costos de almohadas', e); }\n  }\n  function cargarCostosAlmohadas() {\n    try {\n      const raw = localStorage.getItem(ALMOHADAS_SETTINGS_KEY);\n      if (!raw) return;\n      const s = JSON.parse(raw);\n      if (s.tela != null) document.getElementById('precio-tela').value = s.tela;\n      if (s.relleno != null) document.getElementById('precio-relleno').value = s.relleno;\n      if (s.luz != null) document.getElementById('precio-luz').value = s.luz;\n      if (s.costura != null) document.getElementById('precio-costura').value = s.costura;\n      if (s.impresion != null) document.getElementById('precio-impresion').value = s.impresion;\n      if (s.margen != null) {\n        document.getElementById('margen').value = s.margen;\n        document.getElementById('margen-display').textContent = s.margen + '%';\n      }\n    } catch (e) { console.error('No se pudieron leer los costos de almohadas', e); }\n  }\n\n  // Manda la almohada calculada a la pesta\u00f1a \"Cotizaci\u00f3n\" de la app principal.\n  // Como este panel vive en un iframe del mismo origen (srcdoc, sin sandbox),\n  // puede llamar directamente a una funci\u00f3n expuesta por la ventana padre.\n  function agregarACotizacion() {\n    const statusEl = document.getElementById('almohada-add-status');\n    const qty = parseInt(document.getElementById('almohada-qty').value) || 1;\n    const ancho = parseFloat(document.getElementById('ancho').value) || 0;\n    const alto = parseFloat(document.getElementById('alto').value) || 0;\n\n    if (ultimoPrecioVenta <= 0) {\n      statusEl.innerHTML = '<span style=\"color:var(--red)\">Revisa los datos antes de agregarla \u2014 el precio de venta es $0.<\/span>';\n      return;\n    }\n\n    try {\n      if (window.parent && typeof window.parent.addAlmohadaToCotizacion === 'function') {\n        window.parent.addAlmohadaToCotizacion({\n          ancho, alto, conRelleno, caras, qty,\n          costoUnit: ultimoCostoFab,\n          precioUnit: ultimoPrecioVenta\n        });\n        statusEl.innerHTML = '<span style=\"color:var(--green)\">Agregada a la cotizaci\u00f3n \u2713 \u2014 \u00e1brela en la pesta\u00f1a \"Cotizaci\u00f3n\".<\/span>';\n      } else {\n        statusEl.innerHTML = '<span style=\"color:var(--red)\">No se pudo conectar con la cotizaci\u00f3n. Abre esta calculadora dentro de la app SARUX.<\/span>';\n      }\n    } catch (e) {\n      console.error('No se pudo agregar la almohada a la cotizaci\u00f3n', e);\n      statusEl.innerHTML = '<span style=\"color:var(--red)\">No se pudo agregar la almohada a la cotizaci\u00f3n.<\/span>';\n    }\n  }\n\n  // Densidad aproximada para relleno de fibra de poli\u00e9ster (g por cm\u00b2 de almohada)\n  // Referencias est\u00e1ndar para almohada bien llena pero no excesiva:\n  // 30x30 \u2248 150g, 40x40 \u2248 250g, 50x50 \u2248 400g, 60x60 \u2248 600g\n  // F\u00f3rmula: aprox 0.17 g/cm\u00b2 del \u00e1rea de la almohada\n  const DENSIDAD_RELLENO = 0.17; // g/cm\u00b2\n\n  // A4: 21 x 29.7 cm\n  const A4_AREA = 21 * 29.7; // 623.7 cm\u00b2\n\n  function setRelleno(val) {\n    conRelleno = val;\n    document.getElementById('btn-relleno-si').classList.toggle('active', val);\n    document.getElementById('btn-relleno-no').classList.toggle('active', !val);\n    document.getElementById('fila-relleno').style.opacity = val ? '1' : '0.3';\n    calcular();\n  }\n\n  function setCaras(n) {\n    caras = n;\n    document.getElementById('btn-1cara').classList.toggle('active', n === 1);\n    document.getElementById('btn-2caras').classList.toggle('active', n === 2);\n    calcular();\n  }\n\n  function actualizarMargen() {\n    const m = document.getElementById('margen').value;\n    document.getElementById('margen-display').textContent = m + '%';\n    calcular();\n  }\n\n  function fmt(n) {\n    return '$' + n.toFixed(2);\n  }\n\n  function calcular() {\n    const ancho = parseFloat(document.getElementById('ancho').value) || 0;\n    const alto = parseFloat(document.getElementById('alto').value) || 0;\n    const precioTela = parseFloat(document.getElementById('precio-tela').value) || 0;\n    const precioRellenoKg = parseFloat(document.getElementById('precio-relleno').value) || 0;\n    const precioLuz = parseFloat(document.getElementById('precio-luz').value) || 0;\n    const precioCostura = parseFloat(document.getElementById('precio-costura').value) || 0;\n    const precioImpA4 = parseFloat(document.getElementById('precio-impresion').value) || 0;\n    const margen = parseFloat(document.getElementById('margen').value) || 0;\n\n    // --- TELA ---\n    // Cada lado = ancho x alto cm. Son 2 lados. \n    // Ancho de tela = 150cm, se corta la cantidad necesaria en largo.\n    // Largo necesario = (alto * 2 + margen de costura ~4cm) pero simplificamos a 2 lados\n    const largoTela = (alto * 2 + 4) / 100; // metros (los 2 lados + costura)\n    const anchoTela = 150 / 100; // 1.5m fijo\n    const metrosTela = largoTela; // ya que el ancho es fijo en 150cm\n    const costoTela = metrosTela * precioTela;\n\n    // --- RELLENO ---\n    const areaCm2 = ancho * alto;\n    const gramosRelleno = areaCm2 * DENSIDAD_RELLENO;\n    const costoRelleno = conRelleno ? (gramosRelleno / 1000) * precioRellenoKg : 0;\n\n    // --- IMPRESI\u00d3N ---\n    // Escalar desde A4 (623.7cm\u00b2) al tama\u00f1o de cada cara impresa\n    const areaImpresion = ancho * alto; // cm\u00b2 por cara\n    const costoPorCara = (areaImpresion / A4_AREA) * precioImpA4;\n    const costoImpresion = costoPorCara * caras;\n\n    // --- FIJOS ---\n    const costoLuz = precioLuz;\n    const costoCostura = precioCostura;\n\n    // --- TOTAL ---\n    const costoFab = costoTela + costoRelleno + costoImpresion + costoLuz + costoCostura;\n    const precioVenta = costoFab * (1 + margen / 100);\n\n    // Actualizar UI\n    document.getElementById('d-tela-m').textContent = metrosTela.toFixed(3) + ' m';\n    document.getElementById('d-tela').textContent = fmt(costoTela);\n    document.getElementById('d-relleno-g').textContent = Math.round(gramosRelleno) + 'g';\n    document.getElementById('d-relleno').textContent = fmt(costoRelleno);\n    document.getElementById('d-caras').textContent = caras === 1 ? '1 cara' : '2 caras';\n    document.getElementById('d-impresion').textContent = fmt(costoImpresion);\n    document.getElementById('d-luz').textContent = fmt(costoLuz);\n    document.getElementById('d-costura').textContent = fmt(costoCostura);\n    document.getElementById('costo-fab').textContent = fmt(costoFab);\n    document.getElementById('precio-venta').textContent = fmt(precioVenta);\n\n    ultimoCostoFab = costoFab;\n    ultimoPrecioVenta = precioVenta;\n    guardarCostosAlmohadas();\n  }\n\n  // Cargar costos guardados y calcular al cargar\n  cargarCostosAlmohadas();\n  calcular();\n<\/script>\n\n<\/body>\n<\/html>\n";
+document.getElementById('almohadas-frame').srcdoc = almohadasHTML;
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch(e => console.error('No se pudo registrar el service worker', e));
+  });
+}
+
+</script>
+</body>
+</html>
