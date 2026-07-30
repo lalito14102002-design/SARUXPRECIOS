@@ -241,6 +241,9 @@
           <div class="field" style="margin-top:14px;"><label>Embalaje — solo menudeo ($)</label><input type="number" id="shared-embalaje" value="7" step="0.5" oninput="saveSharedSettings()"></div>
           <div class="field"><label>Pasajes/camión — solo menudeo ($)</label><input type="number" id="shared-pasajes" value="16" step="0.5" oninput="saveSharedSettings()"></div>
           <p class="note-line">Estos dos solo se suman al costo y al precio cuando vendes pieza suelta. En mayoreo no se cobran — por eso el precio de mayoreo puede verse mucho más bajo que el de pieza, y está bien que así sea.</p>
+          <div class="field" style="margin-top:14px;"><label>Empaque — Tazas ($)</label><input type="number" id="shared-pack-taza" value="7" step="0.5" oninput="saveSharedSettings(); syncPackFields()"></div>
+          <div class="field"><label>Empaque — Termos ($)</label><input type="number" id="shared-pack-termo" value="10" step="0.5" oninput="saveSharedSettings(); syncPackFields()"></div>
+          <p class="note-line">Este costo de empaque se usa siempre (en pieza y en mayoreo) en las calculadoras de Tazas y Termos. Cámbialo aquí una sola vez — ya no se edita aparte en cada categoría, así nunca vuelve a verse distinto.</p>
           <div class="field" style="margin-top:14px;"><label>Redondear precios de venta</label>
             <select id="shared-round" onchange="saveSharedSettings()">
               <option value="none">Sin redondeo</option>
@@ -488,19 +491,82 @@ function cloudDecode(payload){
   return payload.isJson ? JSON.stringify(payload.v) : payload.v;
 }
 
-/* A partir de ahora, CADA vez que cualquier parte de la app guarde algo con
-   localStorage.setItem(...) — cosa que ya hacía desde antes — también se sube
-   a Supabase. No hizo falta tocar ninguna función de guardado existente. */
-localStorage.setItem = function(key, rawValue){
-  _origSetItem(key, rawValue);
-  if(!sbClient) return;
-  sbClient.from('app_data')
+/* ------------------------------------------------------------
+   COLA DE PENDIENTES (cambios hechos sin internet)
+   ------------------------------------------------------------
+   Si un guardado no logra subir a la nube (por falta de internet),
+   se anota aquí en vez de perderse. En cuanto vuelva la conexión,
+   se reintenta subir automáticamente. Mientras algo esté pendiente,
+   NO se deja que la descarga desde la nube lo sobreescriba. */
+const PENDING_SYNC_KEY = '__sarux_pending_sync_v1';
+function getPendingQueue(){
+  try{ return JSON.parse(_origGetItem(PENDING_SYNC_KEY) || '{}'); }catch(e){ return {}; }
+}
+function setPendingQueue(q){
+  try{ _origSetItem(PENDING_SYNC_KEY, JSON.stringify(q)); }catch(e){}
+}
+function markPending(key, rawValue){
+  const q = getPendingQueue();
+  q[key] = { rawValue, ts: Date.now() };
+  setPendingQueue(q);
+  updatePendingBadge();
+}
+function clearPending(key){
+  const q = getPendingQueue();
+  if(q[key]){ delete q[key]; setPendingQueue(q); updatePendingBadge(); }
+}
+function updatePendingBadge(){
+  const n = Object.keys(getPendingQueue()).length;
+  if(n > 0){ setCloudStatus('⏳ ' + n + ' cambio(s) sin subir — se subirán solos al volver el internet', true); }
+}
+
+function uploadOne(key, rawValue){
+  if(!sbClient) return Promise.resolve(false);
+  return sbClient.from('app_data')
     .upsert({ key, value: cloudEncode(rawValue), updated_at: new Date().toISOString() })
     .then(({error})=>{
-      if(error){ setCloudStatus('⚠️ No se pudo guardar en la nube', true); }
-      else { setCloudStatus('☁️ Sincronizado ✓'); }
+      if(error){ markPending(key, rawValue); return false; }
+      clearPending(key);
+      return true;
     })
-    .catch(()=> setCloudStatus('⚠️ Sin conexión — guardado solo en este celular', true));
+    .catch(()=>{ markPending(key, rawValue); return false; });
+}
+
+/* Reintenta subir todo lo pendiente. Se llama al recuperar internet
+   y también cada cierto tiempo por si acaso. */
+let __flushingPending = false;
+function flushPendingQueue(){
+  if(__flushingPending) return;
+  const q = getPendingQueue();
+  const keys = Object.keys(q);
+  if(keys.length === 0) return;
+  __flushingPending = true;
+  setCloudStatus('☁️ Subiendo ' + keys.length + ' cambio(s) pendiente(s)…');
+  Promise.all(keys.map(k => uploadOne(k, q[k].rawValue)))
+    .then(results=>{
+      __flushingPending = false;
+      const restantes = Object.keys(getPendingQueue()).length;
+      if(restantes === 0) setCloudStatus('☁️ Todo sincronizado ✓');
+      else updatePendingBadge();
+    })
+    .catch(()=>{ __flushingPending = false; });
+}
+
+window.addEventListener('online', flushPendingQueue);
+setInterval(flushPendingQueue, 20000); // reintento periódico de respaldo, cada 20s
+
+/* A partir de ahora, CADA vez que cualquier parte de la app guarde algo con
+   localStorage.setItem(...) — cosa que ya hacía desde antes — también se sube
+   a Supabase. No hizo falta tocar ninguna función de guardado existente.
+   Si falla la subida (sin internet), se anota como pendiente en vez de perderse. */
+localStorage.setItem = function(key, rawValue){
+  _origSetItem(key, rawValue);
+  if(key === PENDING_SYNC_KEY) return; // no sincronizar la cola interna
+  if(!sbClient){ markPending(key, rawValue); return; }
+  if(!navigator.onLine){ markPending(key, rawValue); setCloudStatus('⚠️ Sin conexión — guardado en este celular, se subirá solo después', true); return; }
+  uploadOne(key, rawValue).then(ok=>{
+    if(ok) setCloudStatus('☁️ Sincronizado ✓');
+  });
 };
 
 function setCloudStatus(text, isWarn){
@@ -525,12 +591,16 @@ function setCloudStatus(text, isWarn){
     xhr.send(null);
     if(xhr.status >= 200 && xhr.status < 300){
       const rows = JSON.parse(xhr.responseText);
+      const pending = getPendingQueue();
       rows.forEach(row=>{
+        if(pending[row.key]) return; // hay un cambio local sin subir todavía: no lo pisamos
         const decoded = cloudDecode(row.value);
         if(decoded != null) _origSetItem(row.key, decoded);
       });
     }
   }catch(e){ console.error('No se pudo traer la información guardada en la nube (¿sin internet?)', e); }
+  updatePendingBadge();
+  flushPendingQueue();
 })();
 
 /* Mientras la app está abierta, si tú o tu novia guardan algo desde otro celular,
@@ -1265,6 +1335,8 @@ function exportBackup(){
       ink: document.getElementById('shared-ink') ? document.getElementById('shared-ink').value : null,
       embalaje: document.getElementById('shared-embalaje') ? document.getElementById('shared-embalaje').value : null,
       pasajes: document.getElementById('shared-pasajes') ? document.getElementById('shared-pasajes').value : null,
+      packTaza: document.getElementById('shared-pack-taza') ? document.getElementById('shared-pack-taza').value : null,
+      packTermo: document.getElementById('shared-pack-termo') ? document.getElementById('shared-pack-termo').value : null,
       round: document.getElementById('shared-round') ? document.getElementById('shared-round').value : null,
       ivaOn: document.getElementById('shared-iva-on') ? document.getElementById('shared-iva-on').checked : false,
       ivaPct: document.getElementById('shared-iva-pct') ? document.getElementById('shared-iva-pct').value : null
@@ -1324,10 +1396,22 @@ function applySavedSharedSettings(){
     if(s.ink != null && document.getElementById('shared-ink')) document.getElementById('shared-ink').value = s.ink;
     if(s.embalaje != null && document.getElementById('shared-embalaje')) document.getElementById('shared-embalaje').value = s.embalaje;
     if(s.pasajes != null && document.getElementById('shared-pasajes')) document.getElementById('shared-pasajes').value = s.pasajes;
+    if(s.packTaza != null && document.getElementById('shared-pack-taza')) document.getElementById('shared-pack-taza').value = s.packTaza;
+    if(s.packTermo != null && document.getElementById('shared-pack-termo')) document.getElementById('shared-pack-termo').value = s.packTermo;
     if(s.round != null && document.getElementById('shared-round')) document.getElementById('shared-round').value = s.round;
     if(document.getElementById('shared-iva-on')) document.getElementById('shared-iva-on').checked = !!s.ivaOn;
     if(s.ivaPct != null && document.getElementById('shared-iva-pct')) document.getElementById('shared-iva-pct').value = s.ivaPct;
   }catch(e){ console.error('No se pudieron aplicar los ajustes guardados', e); }
+}
+/* Mantiene el campo "Empaque" de las pestañas Tazas y Termos igual al valor compartido,
+   sin tener que recargar el panel — se llama cada vez que editas el valor compartido. */
+function syncPackFields(){
+  const t = document.getElementById('shared-pack-taza');
+  const mugPack = document.getElementById('mug-pack');
+  if(t && mugPack) mugPack.value = t.value;
+  const te = document.getElementById('shared-pack-termo');
+  const termoPack = document.getElementById('termo-pack');
+  if(te && termoPack) termoPack.value = te.value;
 }
 function saveSharedSettings(){
   try{
@@ -1337,6 +1421,8 @@ function saveSharedSettings(){
       ink: document.getElementById('shared-ink') ? document.getElementById('shared-ink').value : null,
       embalaje: document.getElementById('shared-embalaje') ? document.getElementById('shared-embalaje').value : null,
       pasajes: document.getElementById('shared-pasajes') ? document.getElementById('shared-pasajes').value : null,
+      packTaza: document.getElementById('shared-pack-taza') ? document.getElementById('shared-pack-taza').value : null,
+      packTermo: document.getElementById('shared-pack-termo') ? document.getElementById('shared-pack-termo').value : null,
       round: document.getElementById('shared-round') ? document.getElementById('shared-round').value : null,
       ivaOn: document.getElementById('shared-iva-on') ? document.getElementById('shared-iva-on').checked : false,
       ivaPct: document.getElementById('shared-iva-pct') ? document.getElementById('shared-iva-pct').value : null
@@ -1586,8 +1672,19 @@ function refreshSupplierSelect(id){
   const sel = document.getElementById(id+'-supplier');
   if(!sel) return;
   const items = supplierCatalog[id] || [];
-  const options = items.map(it=>`<option value="${it.price}">${it.name} — $${it.price.toFixed(2)}</option>`).join('');
-  sel.innerHTML = `<option value="">— Selecciona o captura manual —</option>${options}`;
+  const filterEl = document.getElementById(id+'-supplier-filter');
+  const filterNorm = filterEl ? normalizeName(filterEl.value) : '';
+  const filtered = filterNorm ? items.filter(it => normalizeName(it.name).includes(filterNorm)) : items;
+  const previousName = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].getAttribute('data-name') : null;
+  const options = filtered.map(it=>`<option value="${it.price}" data-name="${escapeAttr(it.name)}">${it.name} — $${it.price.toFixed(2)}</option>`).join('');
+  sel.innerHTML = filtered.length
+    ? `<option value="">— Selecciona o captura manual —</option>${options}`
+    : `<option value="">— Sin coincidencias —</option>`;
+  // si el producto que ya tenías seleccionado sigue en la lista filtrada, lo deja marcado
+  if(previousName){
+    const match = Array.from(sel.options).find(o => o.getAttribute('data-name') === previousName);
+    if(match) match.selected = true;
+  }
 }
 
 /* ---------- Descuento por volumen del proveedor (editable, por categoría) ---------- */
@@ -1796,7 +1893,22 @@ function buildProductPanel(cfg){
     `<option value="${it.price}" data-name="${escapeAttr(it.name)}">${it.name} — $${it.price.toFixed(2)}</option>`
   ).join('');
 
+  const packIsShared = (cfg.id === 'mug' || cfg.id === 'termo');
+  const sharedPackId = cfg.id === 'mug' ? 'shared-pack-taza' : (cfg.id === 'termo' ? 'shared-pack-termo' : null);
+  const sharedPackEl = sharedPackId ? document.getElementById(sharedPackId) : null;
+  const packFieldValue = packIsShared && sharedPackEl ? sharedPackEl.value : cfg.packDefault;
+  const packFieldHtml = packIsShared
+    ? `<div class="field"><label>Empaque ($)</label><input type="number" id="${cfg.id}-pack" value="${packFieldValue}" step="0.5" readonly style="opacity:0.7;cursor:not-allowed;"></div>`
+    : `<div class="field"><label>Empaque ($)</label><input type="number" id="${cfg.id}-pack" value="${cfg.packDefault}" step="0.5"></div>`;
+  const packSharedNote = packIsShared
+    ? `<p class="sub" style="margin-top:8px;">Este valor viene de <strong>00 · Costos compartidos</strong> (Empaque — ${cfg.id === 'mug' ? 'Tazas' : 'Termos'}) y se sincroniza en todos tus dispositivos. Para cambiarlo, edítalo ahí.</p>`
+    : '';
+
   const supplierHtml = supplierItems.length ? `
+          <div class="field">
+            <label>Buscar por nombre</label>
+            <input type="text" id="${cfg.id}-supplier-filter" placeholder="Ej. mágica, malla, 11oz…" oninput="refreshSupplierSelect('${cfg.id}')">
+          </div>
           <div class="field">
             <label>Producto del proveedor (opcional)</label>
             <select id="${cfg.id}-supplier" onchange="applySupplierPrice('${cfg.id}')">
@@ -1840,8 +1952,9 @@ function buildProductPanel(cfg){
           <h2><span class="dot"></span>Tiempo y empaque</h2>
           <div class="row2">
             <div class="field"><label>Tiempo de prensado (min)</label><input type="number" id="${cfg.id}-time" value="${cfg.timeDefault}" step="1"></div>
-            <div class="field"><label>Empaque ($)</label><input type="number" id="${cfg.id}-pack" value="${cfg.packDefault}" step="0.5"></div>
+            ${packFieldHtml}
           </div>
+          ${packSharedNote}
         </div>
 
         <div class="card">
@@ -1946,6 +2059,10 @@ function buildOtrosPanel(){
           <div class="field">
             <label>Categoría</label>
             <select id="otros-cat" onchange="renderOtrosProducts()">${catOptions}</select>
+          </div>
+          <div class="field">
+            <label>Buscar por nombre</label>
+            <input type="text" id="otros-supplier-filter" placeholder="Escribe para filtrar…" oninput="filterOtrosSupplierSelect()">
           </div>
           <div class="field">
             <label>Producto</label>
@@ -2108,6 +2225,8 @@ ROPA_DTF_CONFIGS.forEach(cfg=>{
 });
 
 function renderOtrosProducts(){
+  const filterEl = document.getElementById('otros-supplier-filter');
+  if(filterEl) filterEl.value = '';
   const cat = document.getElementById('otros-cat').value;
   const items = otrosCatalog[cat] || [];
   const sel = document.getElementById('otros-supplier');
@@ -2117,6 +2236,20 @@ function renderOtrosProducts(){
   renderCustomProductsList('otros');
   renderDiscountTierTable(currentOtrosTierKey(), 'otros');
   autoFillDiscount(currentOtrosTierKey(), 'otros');
+}
+
+/* Filtra por nombre dentro de la categoría ya elegida, sin tocar lo demás del panel. */
+function filterOtrosSupplierSelect(){
+  const cat = document.getElementById('otros-cat').value;
+  const items = otrosCatalog[cat] || [];
+  const filterEl = document.getElementById('otros-supplier-filter');
+  const filterNorm = filterEl ? normalizeName(filterEl.value) : '';
+  const filtered = filterNorm ? items.filter(it => normalizeName(it.name).includes(filterNorm)) : items;
+  const sel = document.getElementById('otros-supplier');
+  sel.innerHTML = filtered.length
+    ? filtered.map(it => `<option value="${it.price}" data-name="${escapeAttr(it.name)}">${it.name} — $${it.price.toFixed(2)}</option>`).join('')
+    : `<option value="">— Sin coincidencias —</option>`;
+  applySupplierPrice('otros');
 }
 
 document.getElementById('panel-otros').innerHTML = buildOtrosPanel();
@@ -2780,142 +2913,171 @@ function loadImagePromise(src){
 }
 
 async function drawQuoteToCanvas(q){
-  const canvas = document.getElementById('cot-canvas');
-  const W = canvas.width, H = canvas.height;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0,0,W,H);
+  /* Se dibuja primero sobre un lienzo temporal generosamente alto, y al final
+     se recorta el canvas visible exactamente a donde terminó el contenido —
+     así nunca queda un bloque de espacio en blanco después del pie de página. */
+  const W = 1700;
+  const M = 70;
+  const MAXH = 2600;
+  const off = document.createElement('canvas');
+  off.width = W; off.height = MAXH;
+  const ctx = off.getContext('2d');
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0,0,W,H);
+  ctx.fillRect(0,0,W,MAXH);
 
-  const M = 90;
   let y = M;
 
   const logoDataUrl = localStorage.getItem(LOGO_KEY);
   const logoImg = logoDataUrl ? await loadImagePromise(logoDataUrl) : null;
 
   ctx.textAlign = 'left';
+  let logoBlockH = 0;
   if(logoImg){
-    const maxLogoH = 90, maxLogoW = 320;
+    const maxLogoH = 150, maxLogoW = 460;
     let lw = logoImg.width, lh = logoImg.height;
     const scale = Math.min(maxLogoW/lw, maxLogoH/lh, 1);
     lw *= scale; lh *= scale;
     ctx.drawImage(logoImg, M, y, lw, lh);
+    logoBlockH = lh;
   } else {
     ctx.fillStyle = '#0a0a0c';
-    ctx.font = "700 54px 'Space Grotesk', sans-serif";
-    ctx.fillText('SARUX', M, y+40);
-    ctx.font = "400 18px 'JetBrains Mono', monospace";
+    ctx.font = "700 72px 'Space Grotesk', sans-serif";
+    ctx.fillText('SARUX', M, y+56);
+    ctx.font = "400 22px 'JetBrains Mono', monospace";
     ctx.fillStyle = '#888';
-    ctx.fillText('Diseño y sublimación', M, y+68);
+    ctx.fillText('Diseño y sublimación', M, y+90);
+    logoBlockH = 96;
   }
 
   ctx.textAlign = 'right';
   ctx.fillStyle = '#c81e3a';
+  ctx.font = "700 30px 'JetBrains Mono', monospace";
+  ctx.fillText('COTIZACIÓN', W-M, y+16);
   ctx.font = "600 24px 'JetBrains Mono', monospace";
-  ctx.fillText('COTIZACIÓN', W-M, y+10);
-  ctx.font = "500 20px 'JetBrains Mono', monospace";
   ctx.fillStyle = '#444';
-  ctx.fillText(q.number ? ('COT-'+String(q.number).padStart(4,'0')) : 'BORRADOR — sin folio', W-M, y+38);
+  ctx.fillText(q.number ? ('COT-'+String(q.number).padStart(4,'0')) : 'BORRADOR — sin folio', W-M, y+48);
   const d = new Date(q.dateISO);
   const fecha = d.toLocaleDateString('es-MX', {year:'numeric', month:'long', day:'numeric'});
   const hora = d.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'});
-  ctx.fillText(fecha+' · '+hora, W-M, y+64);
+  ctx.font = "500 22px 'JetBrains Mono', monospace";
+  ctx.fillText(fecha+' · '+hora, W-M, y+78);
 
   const contactPhone = (localStorage.getItem(COT_PHONE_KEY) || '').trim();
+  let headerRightH = 78;
   if(contactPhone){
-    ctx.font = "500 20px 'JetBrains Mono', monospace";
+    ctx.font = "600 24px 'JetBrains Mono', monospace";
     ctx.fillStyle = '#0a0a0c';
-    ctx.fillText(contactPhone, W-M, y+90);
+    ctx.fillText(contactPhone, W-M, y+108);
+    headerRightH = 108;
   }
   ctx.textAlign = 'left';
 
-  y += 110;
+  y += Math.max(logoBlockH, headerRightH) + 26;
   ctx.strokeStyle = '#c81e3a';
   ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(M,y); ctx.lineTo(W-M,y); ctx.stroke();
 
-  y += 50;
+  y += 46;
   ctx.fillStyle = '#0a0a0c';
-  ctx.font = "600 26px 'Inter', sans-serif";
+  ctx.font = "700 32px 'Inter', sans-serif";
   ctx.fillText('Cliente: '+q.client, M, y);
-  y += 38;
   if(q.concept){
-    ctx.font = "400 22px 'Inter', sans-serif";
+    ctx.font = "400 26px 'Inter', sans-serif";
     ctx.fillStyle = '#333';
-    y = wrapCanvasText(ctx, 'Concepto: '+q.concept, M, y, W-2*M, 30);
+    y = wrapCanvasText(ctx, 'Concepto: '+q.concept, M, y+40, W-2*M, 34);
+  } else {
+    y += 10;
   }
 
-  y += 26;
-  const colX = [M, M+700, M+950, M+1220, M+1470];
+  y += 22;
+  const colX = [M, M+660, M+920, M+1200, W-M];
   ctx.fillStyle = '#0a0a0c';
-  ctx.fillRect(M, y, W-2*M, 50);
+  ctx.fillRect(M, y, W-2*M, 58);
   ctx.fillStyle = '#ffffff';
-  ctx.font = "600 19px 'JetBrains Mono', monospace";
-  ctx.fillText('PRODUCTO', colX[0]+16, y+33);
-  ctx.fillText('CANT.', colX[1], y+33);
-  ctx.fillText('P/PZA', colX[2], y+33);
-  ctx.fillText('P/MAYOREO', colX[3], y+33);
-  ctx.fillText('AHORRO', colX[4], y+33);
-  y += 50;
+  ctx.font = "700 22px 'JetBrains Mono', monospace";
+  ctx.textAlign = 'left';
+  ctx.fillText('PRODUCTO', colX[0]+18, y+38);
+  ctx.fillText('CANT.', colX[1], y+38);
+  ctx.fillText('P/PZA', colX[2], y+38);
+  ctx.fillText('P/MAYOREO', colX[3], y+38);
+  ctx.textAlign = 'right';
+  ctx.fillText('TOTAL', colX[4], y+38);
+  ctx.textAlign = 'left';
+  y += 58;
 
-  const tableTop = y;
-  const maxTableHeight = 900;
-  const rowH = Math.max(32, Math.min(58, Math.floor(maxTableHeight / Math.max(q.items.length,1))));
-  const nameFont = rowH < 40 ? "400 16px 'Inter', sans-serif" : "400 19px 'Inter', sans-serif";
+  const itemCount = Math.max(q.items.length,1);
+  const rowH = itemCount<=8 ? 66 : itemCount<=14 ? 54 : itemCount<=20 ? 44 : 36;
+  const nameFont = rowH < 44 ? "400 18px 'Inter', sans-serif" : "400 24px 'Inter', sans-serif";
+  const numFont = rowH < 44 ? "500 18px 'Inter', sans-serif" : "500 24px 'Inter', sans-serif";
 
   q.items.forEach((it,i)=>{
     if(i % 2 === 1){
       ctx.fillStyle = '#f4f2ef';
       ctx.fillRect(M, y, W-2*M, rowH);
     }
+    const maxChars = rowH < 44 ? 46 : 38;
+    const name = it.name.length > maxChars ? it.name.slice(0,maxChars-1)+'…' : it.name;
     ctx.font = nameFont;
     ctx.fillStyle = '#0a0a0c';
-    const maxChars = rowH < 40 ? 50 : 44;
-    const name = it.name.length > maxChars ? it.name.slice(0,maxChars-1)+'…' : it.name;
-    ctx.fillText(name, colX[0]+16, y+rowH/2+7);
-    ctx.fillText(String(it.qty), colX[1], y+rowH/2+7);
-    ctx.fillText('$'+it.priceUnit.toFixed(2), colX[2], y+rowH/2+7);
+    ctx.textAlign = 'left';
+    ctx.fillText(name, colX[0]+18, y+rowH/2+8);
+    ctx.font = numFont;
+    ctx.fillText(String(it.qty), colX[1], y+rowH/2+8);
+    ctx.fillText('$'+it.priceUnit.toFixed(2), colX[2], y+rowH/2+8);
     ctx.fillStyle = '#c81e3a';
-    ctx.fillText('$'+it.priceBulk.toFixed(2), colX[3], y+rowH/2+7);
-    ctx.fillStyle = '#1f8a4c';
-    ctx.fillText(it.savingsPct.toFixed(0)+'%', colX[4], y+rowH/2+7);
+    ctx.fillText('$'+it.priceBulk.toFixed(2), colX[3], y+rowH/2+8);
+    ctx.fillStyle = '#0a0a0c';
+    ctx.font = rowH < 44 ? "700 18px 'Inter', sans-serif" : "700 24px 'Inter', sans-serif";
+    ctx.textAlign = 'right';
+    ctx.fillText('$'+it.totalBulk.toFixed(2), colX[4], y+rowH/2+8);
+    ctx.textAlign = 'left';
     y += rowH;
   });
 
-  y += 24;
+  y += 18;
   ctx.strokeStyle = '#ddd';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(M,y); ctx.lineTo(W-M,y); ctx.stroke();
-  y += 50;
+  y += 52;
 
   ctx.textAlign = 'right';
   ctx.fillStyle = '#333';
-  ctx.font = "500 22px 'Inter', sans-serif";
-  ctx.fillText('Total mayoreo:', W-M-260, y);
-  ctx.font = "700 30px 'Space Grotesk', sans-serif";
+  ctx.font = "600 26px 'Inter', sans-serif";
+  ctx.fillText('Total mayoreo:', W-M-280, y);
+  ctx.font = "700 36px 'Space Grotesk', sans-serif";
   ctx.fillStyle = '#0a0a0c';
   ctx.fillText('$'+q.totalBulk.toFixed(2), W-M, y);
-  y += 44;
-  ctx.font = "500 22px 'Inter', sans-serif";
+  y += 52;
+  ctx.font = "600 26px 'Inter', sans-serif";
   ctx.fillStyle = '#1f8a4c';
-  ctx.fillText('Ahorras en total:', W-M-260, y);
-  ctx.font = "700 30px 'Space Grotesk', sans-serif";
+  ctx.fillText('Ahorras en total:', W-M-280, y);
+  ctx.font = "700 36px 'Space Grotesk', sans-serif";
   ctx.fillText('$'+q.totalSavings.toFixed(2), W-M, y);
   ctx.textAlign = 'left';
 
-  y = Math.max(y+90, tableTop + q.items.length*rowH + 200);
-  y = Math.min(y, H - 260);
+  y += 60;
   ctx.fillStyle = '#0a0a0c';
-  ctx.font = "600 22px 'Inter', sans-serif";
+  ctx.font = "700 26px 'Inter', sans-serif";
   ctx.fillText('Términos y condiciones', M, y);
-  y += 32;
-  ctx.font = "400 18px 'Inter', sans-serif";
+  y += 36;
+  ctx.font = "400 21px 'Inter', sans-serif";
   ctx.fillStyle = '#555';
-  wrapCanvasText(ctx, q.terms || '', M, y, W-2*M, 26);
+  y = wrapCanvasText(ctx, q.terms || '', M, y, W-2*M, 29);
 
+  y += 44;
   ctx.fillStyle = '#999';
-  ctx.font = "400 16px 'JetBrains Mono', monospace";
-  ctx.fillText('Generado el '+new Date().toLocaleString('es-MX'), M, H-M+10);
+  ctx.font = "400 18px 'JetBrains Mono', monospace";
+  ctx.fillText('Generado el '+new Date().toLocaleString('es-MX'), M, y);
+
+  /* Recorta el canvas visible al alto real del contenido (con un pequeño margen inferior) */
+  const finalH = Math.min(Math.max(y + M - 10, 700), MAXH);
+  const canvas = document.getElementById('cot-canvas');
+  canvas.width = W;
+  canvas.height = finalH;
+  const finalCtx = canvas.getContext('2d');
+  finalCtx.fillStyle = '#ffffff';
+  finalCtx.fillRect(0,0,W,finalH);
+  finalCtx.drawImage(off, 0,0,W,finalH, 0,0,W,finalH);
 }
 
 function renderSavedQuotesList(){
