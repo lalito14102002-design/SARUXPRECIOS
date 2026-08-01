@@ -225,7 +225,11 @@
     <button class="tab" data-tab="ropadtf"><span class="n">09b</span> Playera/Sudadera DTF</button>
     <button class="tab" data-tab="lista"><span class="n">10</span> Lista de precios</button>
     <button class="tab" data-tab="cotizacion"><span class="n">11</span> Cotización</button>
+    <button class="tab" data-tab="ventas"><span class="n">12</span> Ventas</button>
+    <button class="tab" data-tab="admin"><span class="n">13</span> Ganancias</button>
+    <button class="tab" data-tab="inventario"><span class="n">14</span> Inventario<span id="inv-alert-dot" style="display:none;width:8px;height:8px;border-radius:50%;background:var(--red-bright);margin-left:6px;"></span></button>
   </div>
+
 
   <!-- ===================== COSTOS COMPARTIDOS ===================== -->
   <div class="panel" id="panel-costos">
@@ -306,6 +310,45 @@
   <div class="panel active" id="panel-dtf">
     <div class="grid">
       <div>
+        <div class="card">
+          <h2><span class="dot"></span>Medidas de playeras guardadas</h2>
+          <p class="sub">Guarda las medidas que ya usas (chica/mediana/grande, pecho, espalda, manga…) y elígelas aquí para que el ancho y alto del diseño se llenen solos.</p>
+          <div class="field"><label>Usar una medida guardada</label>
+            <select id="dtf-preset-select" onchange="aplicarMedidaPlayera()">
+              <option value="">— Elige una medida —</option>
+            </select>
+          </div>
+          <details style="margin-top:6px;">
+            <summary style="cursor:pointer;color:var(--text-dim);font-size:12.5px;font-family:'JetBrains Mono',monospace;">+ Agregar / administrar medidas</summary>
+            <div style="margin-top:12px;">
+              <div class="row2">
+                <div class="field"><label>Talla de playera</label>
+                  <select id="preset-talla">
+                    <option value="CH">Chica (CH)</option>
+                    <option value="M" selected>Mediana (M)</option>
+                    <option value="G">Grande (G)</option>
+                    <option value="XG">Extra Grande (XG)</option>
+                    <option value="2XL">2XL</option>
+                  </select>
+                </div>
+                <div class="field"><label>Parte del estampado</label><input type="text" id="preset-parte" placeholder="Ej. Pecho, Espalda, Manga"></div>
+              </div>
+              <div class="row2">
+                <div class="field"><label>Ancho del estampado (cm)</label><input type="number" id="preset-ancho" step="0.1" min="0"></div>
+                <div class="field"><label>Alto del estampado (cm)</label><input type="number" id="preset-alto" step="0.1" min="0"></div>
+              </div>
+              <div class="actions"><button class="btn ghost small" onclick="agregarMedidaPlayera()">+ Guardar medida</button></div>
+              <p class="note-line" id="preset-status"></p>
+              <div style="overflow-x:auto;margin-top:8px;">
+                <table id="preset-table">
+                  <thead><tr><th>Talla</th><th>Parte</th><th>Ancho</th><th>Alto</th><th></th></tr></thead>
+                  <tbody id="preset-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </details>
+        </div>
+
         <div class="card">
           <h2><span class="dot"></span>Diseño y rollo</h2>
           <p class="sub">Medidas en centímetros.</p>
@@ -455,6 +498,9 @@
   <div class="panel" id="panel-ropadtf"></div>
   <div class="panel" id="panel-lista"></div>
   <div class="panel" id="panel-cotizacion"></div>
+  <div class="panel" id="panel-ventas"></div>
+  <div class="panel" id="panel-admin"></div>
+  <div class="panel" id="panel-inventario"></div>
 </div>
 
 <script>
@@ -730,6 +776,89 @@ function addDesignRow(name,w,h,qty){
 addDesignRow('Lápices/colores', 4.5, 1.2, 50);
 addDesignRow('Circular multiusos', 4, 4, 20);
 addDesignRow('Libros/cuadernos', 8, 4, 10);
+
+/* ---------- Medidas de playeras guardadas (presets para DTF) ----------
+   Guarda medidas de estampado que ya usas (por talla, por parte de la playera, etc.)
+   para no tener que escribir ancho/alto a mano cada vez en la pestaña DTF. */
+const MEDIDAS_PLAYERA_KEY = 'sarux_medidas_playera_v1';
+function loadMedidasPlayera(){
+  try{ return JSON.parse(localStorage.getItem(MEDIDAS_PLAYERA_KEY) || '[]'); }catch(e){ return []; }
+}
+function saveMedidasPlayera(list){
+  try{ localStorage.setItem(MEDIDAS_PLAYERA_KEY, JSON.stringify(list)); }catch(e){ console.error('No se pudieron guardar las medidas de playera', e); }
+}
+
+const TALLA_LABELS = {CH:'Chica', M:'Mediana', G:'Grande', XG:'Extra Grande', '2XL':'2XL'};
+
+function agregarMedidaPlayera(){
+  const statusEl = document.getElementById('preset-status');
+  const talla = document.getElementById('preset-talla').value;
+  const parte = (document.getElementById('preset-parte').value || '').trim();
+  const ancho = parseFloat(document.getElementById('preset-ancho').value) || 0;
+  const alto = parseFloat(document.getElementById('preset-alto').value) || 0;
+
+  if(!parte){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Dile qué parte es (pecho, espalda, manga…).</span>'; return; }
+  if(ancho <= 0 || alto <= 0){ statusEl.innerHTML = '<span style="color:var(--red-bright)">El ancho y el alto deben ser mayores a 0.</span>'; return; }
+
+  const medidas = loadMedidasPlayera();
+  const existente = medidas.find(m => m.talla === talla && normalizeName(m.parte) === normalizeName(parte));
+  if(existente){ existente.ancho = ancho; existente.alto = alto; }
+  else { medidas.push({ id: uid(), talla, parte, ancho, alto }); }
+  saveMedidasPlayera(medidas);
+
+  document.getElementById('preset-parte').value = '';
+  document.getElementById('preset-ancho').value = '';
+  document.getElementById('preset-alto').value = '';
+  statusEl.innerHTML = '<span style="color:var(--ok)">Medida guardada ✓</span>';
+  renderMedidasPlayera();
+}
+
+function eliminarMedidaPlayera(id){
+  if(!confirm('¿Eliminar esta medida guardada?')) return;
+  const medidas = loadMedidasPlayera().filter(m => m.id !== id);
+  saveMedidasPlayera(medidas);
+  renderMedidasPlayera();
+}
+
+function aplicarMedidaPlayera(){
+  const sel = document.getElementById('dtf-preset-select');
+  if(!sel || !sel.value) return;
+  const medidas = loadMedidasPlayera();
+  const m = medidas.find(x => x.id === sel.value);
+  if(!m) return;
+  document.getElementById('dtf-w').value = m.ancho;
+  document.getElementById('dtf-h').value = m.alto;
+}
+
+function renderMedidasPlayera(){
+  const ordenTalla = ['CH','M','G','XG','2XL'];
+  const medidas = loadMedidasPlayera().sort((a,b)=>{
+    const ta = ordenTalla.indexOf(a.talla), tb = ordenTalla.indexOf(b.talla);
+    if(ta !== tb) return ta - tb;
+    return a.parte.localeCompare(b.parte,'es');
+  });
+
+  const sel = document.getElementById('dtf-preset-select');
+  if(sel){
+    const actual = sel.value;
+    sel.innerHTML = '<option value="">— Elige una medida —</option>' +
+      medidas.map(m => `<option value="${m.id}">${TALLA_LABELS[m.talla]||m.talla} — ${escapeAttr(m.parte)} (${m.ancho}×${m.alto} cm)</option>`).join('');
+    if(medidas.some(m=> m.id === actual)) sel.value = actual;
+  }
+
+  const tbody = document.getElementById('preset-tbody');
+  if(tbody){
+    tbody.innerHTML = medidas.length ? medidas.map(m => `
+      <tr>
+        <td>${TALLA_LABELS[m.talla]||m.talla}</td>
+        <td>${escapeAttr(m.parte)}</td>
+        <td>${m.ancho} cm</td>
+        <td>${m.alto} cm</td>
+        <td><button class="icon-btn" title="Eliminar" onclick="eliminarMedidaPlayera('${m.id}')">✕</button></td>
+      </tr>`).join('') : '<tr><td colspan="5" style="color:var(--text-dim);">Sin medidas guardadas todavía.</td></tr>';
+  }
+}
+renderMedidasPlayera();
 
 /* ---------- DTF calculation ---------- */
 function calcDTF(){
@@ -1329,6 +1458,12 @@ function exportBackup(){
     customCategories: JSON.parse(localStorage.getItem(CUSTOM_CATEGORIES_KEY) || '[]'),
     priceOverrides: JSON.parse(localStorage.getItem(PRICE_OVERRIDES_KEY) || '{"supplier":{},"otros":{}}'),
     almohadasSettings: JSON.parse(localStorage.getItem('sarux_almohadas_settings_v1') || 'null'),
+    ventas: JSON.parse(localStorage.getItem(VENTAS_KEY) || '[]'),
+    inventario: JSON.parse(localStorage.getItem(INVENTARIO_KEY) || '[]'),
+    gastos: JSON.parse(localStorage.getItem(GASTOS_KEY) || '[]'),
+    meta: localStorage.getItem(META_KEY) || '0',
+    compras: JSON.parse(localStorage.getItem(COMPRAS_KEY) || '[]'),
+    medidasPlayera: JSON.parse(localStorage.getItem(MEDIDAS_PLAYERA_KEY) || '[]'),
     sharedSettings: {
       luz: document.getElementById('shared-luz') ? document.getElementById('shared-luz').value : null,
       labor: document.getElementById('shared-labor') ? document.getElementById('shared-labor').value : null,
@@ -1372,6 +1507,12 @@ function importBackupFile(event){
       if(backup.customCategories) localStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify(backup.customCategories));
       if(backup.priceOverrides) localStorage.setItem(PRICE_OVERRIDES_KEY, JSON.stringify(backup.priceOverrides));
       if(backup.almohadasSettings) localStorage.setItem('sarux_almohadas_settings_v1', JSON.stringify(backup.almohadasSettings));
+      if(backup.ventas) localStorage.setItem(VENTAS_KEY, JSON.stringify(backup.ventas));
+      if(backup.inventario) localStorage.setItem(INVENTARIO_KEY, JSON.stringify(backup.inventario));
+      if(backup.gastos) localStorage.setItem(GASTOS_KEY, JSON.stringify(backup.gastos));
+      if(backup.meta != null) localStorage.setItem(META_KEY, String(backup.meta));
+      if(backup.compras) localStorage.setItem(COMPRAS_KEY, JSON.stringify(backup.compras));
+      if(backup.medidasPlayera) localStorage.setItem(MEDIDAS_PLAYERA_KEY, JSON.stringify(backup.medidasPlayera));
       if(backup.sharedSettings){
         localStorage.setItem(SHARED_SETTINGS_KEY, JSON.stringify(backup.sharedSettings));
       }
@@ -2464,6 +2605,732 @@ function renderListaTable(){
 
 document.getElementById('panel-lista').innerHTML = buildListaPanel();
 renderListaTable();
+
+/* ============================================================
+   VENTAS, GANANCIAS E INVENTARIO
+   ============================================================
+   Todo se guarda con localStorage.setItem, así que se sincroniza
+   solo a la nube igual que el resto de la app (ver bloque de
+   Supabase arriba) — tú y tu novia ven las mismas ventas y el
+   mismo inventario en cualquier celular.
+   ------------------------------------------------------------ */
+const VENTAS_KEY = 'sarux_ventas_v1';
+const INVENTARIO_KEY = 'sarux_inventario_v1';
+
+function loadVentas(){
+  try{ return JSON.parse(localStorage.getItem(VENTAS_KEY) || '[]'); }catch(e){ return []; }
+}
+function saveVentas(list){
+  try{ localStorage.setItem(VENTAS_KEY, JSON.stringify(list)); }catch(e){ console.error('No se pudieron guardar las ventas', e); }
+}
+function loadInventario(){
+  try{ return JSON.parse(localStorage.getItem(INVENTARIO_KEY) || '[]'); }catch(e){ return []; }
+}
+function saveInventario(list){
+  try{ localStorage.setItem(INVENTARIO_KEY, JSON.stringify(list)); }catch(e){ console.error('No se pudo guardar el inventario', e); }
+}
+function fmt2(n){ return '$' + (Number(n)||0).toFixed(2); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+/* Lista plana de todos los productos del catálogo (igual que en "Lista de precios"),
+   usada para el buscador/autocompletado al registrar una venta o dar de alta inventario. */
+function getAllCatalogProductNames(){
+  const names = new Set();
+  productConfigs.forEach(cfg=>{
+    (supplierCatalog[cfg.id] || []).forEach(it=> names.add(it.name));
+  });
+  Object.keys(otrosCatalog).forEach(cat=>{
+    otrosCatalog[cat].forEach(it=> names.add(it.name));
+  });
+  try{
+    const custom = JSON.parse(localStorage.getItem(CUSTOM_PRODUCTS_KEY) || '{}');
+    Object.keys(custom).forEach(cat=>{ (custom[cat]||[]).forEach(it=> names.add(it.name || it)); });
+  }catch(e){}
+  return Array.from(names).sort((a,b)=> a.localeCompare(b,'es'));
+}
+
+/* -------------------------- VENTAS -------------------------- */
+function buildVentasPanel(){
+  return `
+    <div class="card">
+      <h2><span class="dot"></span>Registrar una venta</h2>
+      <p class="sub">Anota el producto, lo que te costó producirlo según la calculadora, y en cuánto lo vendiste realmente. La ganancia se calcula sola.</p>
+      <div class="field"><label>Producto</label>
+        <input type="text" id="venta-producto" list="venta-producto-list" placeholder="Ej. Taza mágica 11oz">
+        <datalist id="venta-producto-list"></datalist>
+      </div>
+      <div class="row3">
+        <div class="field"><label>Cantidad</label><input type="number" id="venta-cantidad" value="1" min="1" step="1"></div>
+        <div class="field"><label>Costo por pieza (calculadora) $</label><input type="number" id="venta-costo" value="" step="0.5" min="0"></div>
+        <div class="field"><label>Precio de venta por pieza $</label><input type="number" id="venta-precio" value="" step="0.5" min="0"></div>
+      </div>
+      <div class="check" style="margin-top:6px;"><input type="checkbox" id="venta-descontar-inv" checked><label style="margin:0;font-family:'Inter',sans-serif;color:var(--text);font-size:13px;">Descontar del inventario si el producto existe ahí</label></div>
+      <div class="field" style="margin-top:10px;"><label>Notas (opcional)</label><input type="text" id="venta-notas" placeholder="Ej. Cliente Juan, pedido de cumpleaños"></div>
+      <div class="stat-grid" style="margin-top:6px;">
+        <div class="stat"><div class="label">Ganancia por pieza</div><div class="val ok" id="venta-preview-unit">$0.00</div></div>
+        <div class="stat"><div class="label">Ganancia total de esta venta</div><div class="val ok" id="venta-preview-total">$0.00</div></div>
+      </div>
+      <div class="actions" style="margin-top:10px;">
+        <button class="btn" onclick="registrarVenta()">+ Registrar venta</button>
+      </div>
+      <p class="note-line" id="venta-status"></p>
+    </div>
+    <div class="card">
+      <h2><span class="dot"></span>Historial de ventas</h2>
+      <div class="field"><label>Buscar</label><input type="text" id="venta-search" placeholder="Filtra por producto o nota…" oninput="renderVentasTable()"></div>
+      <div style="overflow-x:auto;">
+        <table id="ventas-table">
+          <thead><tr>
+            <th>Fecha</th><th>Producto</th><th>Cant.</th><th>Costo/pza</th><th>Venta/pza</th><th>Ganancia</th><th></th>
+          </tr></thead>
+          <tbody id="ventas-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function refreshVentaPreview(){
+  const cantidad = parseFloat(document.getElementById('venta-cantidad').value) || 0;
+  const costo = parseFloat(document.getElementById('venta-costo').value) || 0;
+  const precio = parseFloat(document.getElementById('venta-precio').value) || 0;
+  const gananciaUnit = precio - costo;
+  const el1 = document.getElementById('venta-preview-unit');
+  const el2 = document.getElementById('venta-preview-total');
+  if(el1) el1.textContent = fmt2(gananciaUnit);
+  if(el2) el2.textContent = fmt2(gananciaUnit * cantidad);
+  [el1, el2].forEach(el=>{ if(el) el.classList.toggle('accent', gananciaUnit < 0); });
+}
+
+function registrarVenta(){
+  const statusEl = document.getElementById('venta-status');
+  const producto = (document.getElementById('venta-producto').value || '').trim();
+  const cantidad = parseFloat(document.getElementById('venta-cantidad').value) || 0;
+  const costo = parseFloat(document.getElementById('venta-costo').value) || 0;
+  const precio = parseFloat(document.getElementById('venta-precio').value) || 0;
+  const notas = (document.getElementById('venta-notas').value || '').trim();
+  const descontarInv = document.getElementById('venta-descontar-inv').checked;
+
+  if(!producto){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Escribe el nombre del producto.</span>'; return; }
+  if(cantidad <= 0){ statusEl.innerHTML = '<span style="color:var(--red-bright)">La cantidad debe ser mayor a 0.</span>'; return; }
+
+  const ganancia = (precio - costo) * cantidad;
+  const venta = {
+    id: uid(),
+    fecha: new Date().toISOString(),
+    producto, cantidad, costo, precio,
+    ingreso: precio * cantidad,
+    ganancia,
+    notas
+  };
+  const ventas = loadVentas();
+  ventas.unshift(venta);
+  saveVentas(ventas);
+
+  if(descontarInv){
+    const inv = loadInventario();
+    const item = inv.find(i => normalizeName(i.producto) === normalizeName(producto));
+    if(item){
+      item.stock = Math.max(0, (parseFloat(item.stock)||0) - cantidad);
+      saveInventario(inv);
+    }
+  }
+
+  document.getElementById('venta-producto').value = '';
+  document.getElementById('venta-cantidad').value = '1';
+  document.getElementById('venta-costo').value = '';
+  document.getElementById('venta-precio').value = '';
+  document.getElementById('venta-notas').value = '';
+  refreshVentaPreview();
+  statusEl.innerHTML = '<span style="color:var(--ok)">Venta registrada ✓ — Ganancia: ' + fmt2(ganancia) + '</span>';
+  renderVentasTable();
+  populateVentaDatalist();
+  if(document.getElementById('panel-admin').innerHTML) renderAdminPanel();
+  if(document.getElementById('inventario-tbody')) renderInventarioTable();
+}
+
+function eliminarVenta(id){
+  if(!confirm('¿Eliminar esta venta? No se puede deshacer.')) return;
+  const ventas = loadVentas().filter(v=> v.id !== id);
+  saveVentas(ventas);
+  renderVentasTable();
+  if(document.getElementById('panel-admin').innerHTML) renderAdminPanel();
+}
+
+function populateVentaDatalist(){
+  const dl = document.getElementById('venta-producto-list');
+  if(!dl) return;
+  dl.innerHTML = getAllCatalogProductNames().map(n=>`<option value="${escapeAttr(n)}"></option>`).join('');
+}
+
+function renderVentasTable(){
+  const tbody = document.getElementById('ventas-tbody');
+  if(!tbody) return;
+  const searchEl = document.getElementById('venta-search');
+  const search = searchEl ? normalizeName(searchEl.value) : '';
+  const ventas = loadVentas();
+  let rows = '';
+  ventas.forEach(v=>{
+    if(search && !normalizeName(v.producto).includes(search) && !normalizeName(v.notas||'').includes(search)) return;
+    const fecha = new Date(v.fecha);
+    const fechaStr = fecha.toLocaleDateString('es-MX', {day:'2-digit', month:'short', year:'2-digit'});
+    const gananciaColor = v.ganancia < 0 ? 'var(--red-bright)' : 'var(--ok)';
+    rows += `<tr>
+      <td>${fechaStr}</td>
+      <td>${escapeAttr(v.producto)}${v.notas ? '<br><span style="color:var(--text-dim);font-size:11px;">'+escapeAttr(v.notas)+'</span>' : ''}</td>
+      <td>${v.cantidad}</td>
+      <td>$${(v.costo||0).toFixed(2)}</td>
+      <td>$${(v.precio||0).toFixed(2)}</td>
+      <td style="color:${gananciaColor};font-weight:600;">$${(v.ganancia||0).toFixed(2)}</td>
+      <td><button class="icon-btn" title="Eliminar" onclick="eliminarVenta('${v.id}')">✕</button></td>
+    </tr>`;
+  });
+  tbody.innerHTML = rows || '<tr><td colspan="7" style="color:var(--text-dim);">Sin ventas registradas todavía.</td></tr>';
+}
+
+/* -------------------------- GANANCIAS (ADMIN) -------------------------- */
+const GASTOS_KEY = 'sarux_gastos_v1';
+const META_KEY = 'sarux_meta_v1';
+
+function loadGastos(){
+  try{ return JSON.parse(localStorage.getItem(GASTOS_KEY) || '[]'); }catch(e){ return []; }
+}
+function saveGastos(list){
+  try{ localStorage.setItem(GASTOS_KEY, JSON.stringify(list)); }catch(e){ console.error('No se pudieron guardar los gastos', e); }
+}
+function loadMeta(){
+  const raw = localStorage.getItem(META_KEY);
+  return raw != null ? parseFloat(raw) || 0 : 0;
+}
+function saveMeta(valor){
+  try{ localStorage.setItem(META_KEY, String(valor)); }catch(e){}
+}
+
+function buildAdminPanel(){
+  return `
+    <div class="card">
+      <h2><span class="dot"></span>Resumen de ganancias</h2>
+      <div class="field"><label>Periodo</label>
+        <select id="admin-periodo" onchange="renderAdminPanel()">
+          <option value="hoy">Hoy</option>
+          <option value="semana">Últimos 7 días</option>
+          <option value="mes">Últimos 30 días</option>
+          <option value="todo" selected>Todo el historial</option>
+        </select>
+      </div>
+      <div class="stat-grid" id="admin-stats"></div>
+      <p class="note-line" id="admin-real-note" style="margin-top:6px;"></p>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot"></span>Meta mensual</h2>
+      <p class="sub">Ponte una meta de ganancia para el mes en curso (calendario, del día 1 a hoy) y ve tu avance.</p>
+      <div class="row2">
+        <div class="field"><label>Meta de ganancia del mes ($)</label><input type="number" id="meta-input" value="0" min="0" step="100" onchange="saveMeta(this.value); renderAdminPanel();"></div>
+      </div>
+      <div id="meta-progreso"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot"></span>Gastos fijos mensuales</h2>
+      <p class="sub">Renta, luz, internet, gasolina, etc. — todo lo que pagas cada mes sin importar cuánto vendas. Se usa para calcular tu "ganancia real" arriba.</p>
+      <div class="row3">
+        <div class="field"><label>Concepto</label><input type="text" id="gasto-concepto" placeholder="Ej. Renta del local"></div>
+        <div class="field"><label>Monto mensual ($)</label><input type="number" id="gasto-monto" min="0" step="50"></div>
+        <div class="field" style="display:flex;align-items:flex-end;"><button class="btn" style="width:100%;" onclick="agregarGasto()">+ Agregar gasto</button></div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="gastos-table">
+          <thead><tr><th>Concepto</th><th>Monto mensual</th><th></th></tr></thead>
+          <tbody id="gastos-tbody"></tbody>
+        </table>
+      </div>
+      <p class="note-line" id="gastos-total-note"></p>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot"></span>Ganancia por semana / mes</h2>
+      <div class="field"><label>Ver por</label>
+        <select id="grafica-modo" onchange="renderGraficaGanancia()">
+          <option value="semana">Últimos 7 días</option>
+          <option value="mes">Últimos 6 meses</option>
+        </select>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="ganancia-canvas" width="560" height="260"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot"></span>Ganancia por producto</h2>
+      <p class="sub">Suma de todas las ventas de cada producto en el periodo seleccionado, ordenado por el que más te ha dado de ganancia.</p>
+      <div class="actions" style="margin-bottom:10px;">
+        <button class="btn ghost small" onclick="exportarVentasCSV()">⬇ Exportar ventas a CSV / Excel</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="admin-productos-table">
+          <thead><tr><th>Producto</th><th>Piezas vendidas</th><th>Ingreso total</th><th>Ganancia total</th><th></th></tr></thead>
+          <tbody id="admin-productos-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function agregarGasto(){
+  const concepto = (document.getElementById('gasto-concepto').value || '').trim();
+  const monto = parseFloat(document.getElementById('gasto-monto').value) || 0;
+  if(!concepto || monto <= 0) return;
+  const gastos = loadGastos();
+  gastos.push({ id: uid(), concepto, monto });
+  saveGastos(gastos);
+  document.getElementById('gasto-concepto').value = '';
+  document.getElementById('gasto-monto').value = '';
+  renderAdminPanel();
+}
+
+function eliminarGasto(id){
+  const gastos = loadGastos().filter(g=> g.id !== id);
+  saveGastos(gastos);
+  renderAdminPanel();
+}
+
+function renderGastosTable(){
+  const gastos = loadGastos();
+  const tbody = document.getElementById('gastos-tbody');
+  if(!tbody) return;
+  tbody.innerHTML = gastos.length ? gastos.map(g=>`
+    <tr>
+      <td>${escapeAttr(g.concepto)}</td>
+      <td>$${g.monto.toFixed(2)}</td>
+      <td><button class="icon-btn" title="Eliminar" onclick="eliminarGasto('${g.id}')">✕</button></td>
+    </tr>`).join('') : '<tr><td colspan="3" style="color:var(--text-dim);">Sin gastos fijos capturados.</td></tr>';
+  const total = gastos.reduce((s,g)=> s + g.monto, 0);
+  const noteEl = document.getElementById('gastos-total-note');
+  if(noteEl) noteEl.innerHTML = 'Total de gastos fijos al mes: <strong style="color:var(--text);">' + fmt2(total) + '</strong>';
+}
+
+function ventasEnPeriodo(periodo){
+  const ventas = loadVentas();
+  if(periodo === 'todo') return ventas;
+  const ahora = Date.now();
+  const dias = periodo === 'hoy' ? 1 : (periodo === 'semana' ? 7 : 30);
+  const limite = ahora - dias * 24 * 60 * 60 * 1000;
+  if(periodo === 'hoy'){
+    const hoyStr = new Date().toDateString();
+    return ventas.filter(v => new Date(v.fecha).toDateString() === hoyStr);
+  }
+  return ventas.filter(v => new Date(v.fecha).getTime() >= limite);
+}
+
+/* Prorratea los gastos fijos mensuales según cuántos días cubre el periodo elegido,
+   para poder restarlos de la ganancia y mostrar una "ganancia real" aproximada. */
+function gastosProrrateados(periodo){
+  const totalMensual = loadGastos().reduce((s,g)=> s + g.monto, 0);
+  if(periodo === 'hoy') return totalMensual / 30;
+  if(periodo === 'semana') return totalMensual / 30 * 7;
+  if(periodo === 'mes') return totalMensual;
+  // 'todo': prorratea según los días entre la venta más antigua y hoy (mínimo 1 mes)
+  const ventas = loadVentas();
+  if(!ventas.length) return totalMensual;
+  const fechas = ventas.map(v=> new Date(v.fecha).getTime());
+  const diasTotales = Math.max(30, (Date.now() - Math.min(...fechas)) / (24*60*60*1000));
+  return totalMensual / 30 * diasTotales;
+}
+
+function renderAdminPanel(){
+  const periodoEl = document.getElementById('admin-periodo');
+  const periodo = periodoEl ? periodoEl.value : 'todo';
+  const ventas = ventasEnPeriodo(periodo);
+
+  const totalIngreso = ventas.reduce((s,v)=> s + (v.ingreso||0), 0);
+  const totalGanancia = ventas.reduce((s,v)=> s + (v.ganancia||0), 0);
+  const totalPiezas = ventas.reduce((s,v)=> s + (v.cantidad||0), 0);
+  const ticketProm = ventas.length ? totalIngreso / ventas.length : 0;
+  const gastosPeriodo = gastosProrrateados(periodo);
+  const gananciaReal = totalGanancia - gastosPeriodo;
+
+  const statsEl = document.getElementById('admin-stats');
+  if(statsEl){
+    statsEl.innerHTML = `
+      <div class="stat"><div class="label">Ventas registradas</div><div class="val">${ventas.length}</div></div>
+      <div class="stat"><div class="label">Piezas vendidas</div><div class="val">${totalPiezas}</div></div>
+      <div class="stat"><div class="label">Ingreso total</div><div class="val accent">${fmt2(totalIngreso)}</div></div>
+      <div class="stat"><div class="label">Ganancia por producto</div><div class="val ok">${fmt2(totalGanancia)}</div></div>
+      <div class="stat"><div class="label">Gastos fijos (prorrateados)</div><div class="val">${fmt2(gastosPeriodo)}</div></div>
+      <div class="stat"><div class="label">Ganancia real</div><div class="val" style="color:${gananciaReal<0?'var(--red-bright)':'var(--ok)'}">${fmt2(gananciaReal)}</div></div>
+      <div class="stat"><div class="label">Ticket promedio</div><div class="val">${fmt2(ticketProm)}</div></div>
+    `;
+  }
+  const realNote = document.getElementById('admin-real-note');
+  if(realNote) realNote.textContent = 'La "ganancia real" resta tus gastos fijos (renta, luz, internet, gasolina…) de la ganancia por producto, prorrateados a este periodo.';
+
+  renderGastosTable();
+  renderMetaProgreso();
+  renderGraficaGanancia();
+
+  const porProducto = {};
+  ventas.forEach(v=>{
+    const key = v.producto;
+    if(!porProducto[key]) porProducto[key] = {piezas:0, ingreso:0, ganancia:0};
+    porProducto[key].piezas += (v.cantidad||0);
+    porProducto[key].ingreso += (v.ingreso||0);
+    porProducto[key].ganancia += (v.ganancia||0);
+  });
+  const filas = Object.keys(porProducto).map(k=> ({producto:k, ...porProducto[k]}))
+    .sort((a,b)=> b.ganancia - a.ganancia);
+
+  const maxGanancia = filas.length ? Math.max(...filas.map(f=>f.ganancia), 0.01) : 1;
+  const tbody = document.getElementById('admin-productos-tbody');
+  if(tbody){
+    tbody.innerHTML = filas.length ? filas.map(f=>{
+      const pct = Math.max(2, Math.min(100, (f.ganancia / maxGanancia) * 100));
+      const barColor = f.ganancia < 0 ? 'var(--red-bright)' : 'var(--ok)';
+      return `<tr>
+        <td>${escapeAttr(f.producto)}<div style="height:4px;background:${barColor};border-radius:2px;width:${pct}%;margin-top:6px;opacity:.6;"></div></td>
+        <td>${f.piezas}</td>
+        <td>$${f.ingreso.toFixed(2)}</td>
+        <td style="color:${barColor};font-weight:600;">$${f.ganancia.toFixed(2)}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="4" style="color:var(--text-dim);">Sin ventas en este periodo.</td></tr>';
+  }
+}
+
+function renderMetaProgreso(){
+  const cont = document.getElementById('meta-progreso');
+  if(!cont) return;
+  const meta = loadMeta();
+  const metaInput = document.getElementById('meta-input');
+  if(metaInput && document.activeElement !== metaInput) metaInput.value = meta;
+
+  const ahora = new Date();
+  const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1).getTime();
+  const ventasMes = loadVentas().filter(v => new Date(v.fecha).getTime() >= inicioMes);
+  const gananciaMes = ventasMes.reduce((s,v)=> s + (v.ganancia||0), 0);
+
+  if(meta <= 0){
+    cont.innerHTML = '<p class="note-line">Define una meta arriba para ver tu avance del mes.</p>';
+    return;
+  }
+  const pct = Math.max(0, Math.min(100, (gananciaMes / meta) * 100));
+  const color = pct >= 100 ? 'var(--ok)' : 'var(--red-bright)';
+  cont.innerHTML = `
+    <div style="background:rgba(0,0,0,0.25);border:1px solid var(--line);border-radius:10px;height:22px;overflow:hidden;margin-top:10px;">
+      <div style="height:100%;width:${pct}%;background:${color};transition:width .3s;"></div>
+    </div>
+    <p class="note-line" style="margin-top:8px;">Vas en <strong style="color:var(--text);">${fmt2(gananciaMes)}</strong> de ${fmt2(meta)} (${pct.toFixed(0)}%) este mes.</p>
+  `;
+}
+
+/* Dibuja una gráfica de barras sencilla con canvas 2D (sin librerías), consistente
+   con el resto de la app (igual que las vistas previas de DTF / A4). */
+function renderGraficaGanancia(){
+  const canvas = document.getElementById('ganancia-canvas');
+  if(!canvas) return;
+  const modoEl = document.getElementById('grafica-modo');
+  const modo = modoEl ? modoEl.value : 'semana';
+  const ctx = canvas.getContext('2d');
+  const ventas = loadVentas();
+
+  let buckets = [];
+  if(modo === 'semana'){
+    for(let i=6; i>=0; i--){
+      const d = new Date(); d.setDate(d.getDate()-i); d.setHours(0,0,0,0);
+      buckets.push({ label: d.toLocaleDateString('es-MX',{weekday:'short'}).slice(0,3), start: d.getTime(), end: d.getTime()+24*60*60*1000 });
+    }
+  } else {
+    for(let i=5; i>=0; i--){
+      const d = new Date(); d.setMonth(d.getMonth()-i); d.setDate(1); d.setHours(0,0,0,0);
+      const start = d.getTime();
+      const end = new Date(d.getFullYear(), d.getMonth()+1, 1).getTime();
+      buckets.push({ label: d.toLocaleDateString('es-MX',{month:'short'}), start, end });
+    }
+  }
+  buckets.forEach(b=>{
+    b.total = ventas.filter(v=>{ const t = new Date(v.fecha).getTime(); return t >= b.start && t < b.end; })
+      .reduce((s,v)=> s + (v.ganancia||0), 0);
+  });
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const w = canvas.width, h = canvas.height;
+  const padBottom = 30, padTop = 16, padSide = 10;
+  const maxVal = Math.max(1, ...buckets.map(b=>Math.abs(b.total)));
+  const zeroY = h - padBottom;
+  const barAreaH = h - padBottom - padTop;
+  const barW = (w - padSide*2) / buckets.length * 0.6;
+  const gap = (w - padSide*2) / buckets.length;
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.beginPath(); ctx.moveTo(padSide, zeroY); ctx.lineTo(w-padSide, zeroY); ctx.stroke();
+
+  buckets.forEach((b,i)=>{
+    const x = padSide + i*gap + (gap-barW)/2;
+    const barH = Math.max(2, (Math.abs(b.total)/maxVal) * barAreaH);
+    const y = b.total >= 0 ? zeroY - barH : zeroY;
+    ctx.fillStyle = b.total >= 0 ? 'rgba(47,191,113,0.85)' : 'rgba(232,48,79,0.85)';
+    ctx.fillRect(x, y, barW, barH);
+
+    ctx.fillStyle = '#9a9a9f';
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(b.label, x + barW/2, h - 12);
+
+    ctx.fillStyle = '#f2f0ee';
+    ctx.font = '10px Inter, sans-serif';
+    ctx.fillText('$' + Math.round(b.total), x + barW/2, b.total >= 0 ? y - 4 : y + barH + 12);
+  });
+}
+
+/* Exporta el historial de ventas a un CSV que abre directo en Excel / Sheets. */
+function exportarVentasCSV(){
+  const ventas = loadVentas();
+  if(!ventas.length){ alert('No hay ventas para exportar todavía.'); return; }
+  const headers = ['Fecha','Producto','Cantidad','Costo por pieza','Precio de venta por pieza','Ingreso total','Ganancia total','Notas'];
+  const csvRows = [headers.join(',')];
+  ventas.slice().reverse().forEach(v=>{
+    const fila = [
+      new Date(v.fecha).toLocaleString('es-MX'),
+      '"' + (v.producto||'').replace(/"/g,'""') + '"',
+      v.cantidad, (v.costo||0).toFixed(2), (v.precio||0).toFixed(2),
+      (v.ingreso||0).toFixed(2), (v.ganancia||0).toFixed(2),
+      '"' + (v.notas||'').replace(/"/g,'""') + '"'
+    ];
+    csvRows.push(fila.join(','));
+  });
+  const blob = new Blob(['\ufeff' + csvRows.join('\r\n')], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'sarux-ventas-' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/* -------------------------- INVENTARIO -------------------------- */
+const COMPRAS_KEY = 'sarux_compras_v1';
+function loadCompras(){
+  try{ return JSON.parse(localStorage.getItem(COMPRAS_KEY) || '[]'); }catch(e){ return []; }
+}
+function saveCompras(list){
+  try{ localStorage.setItem(COMPRAS_KEY, JSON.stringify(list)); }catch(e){ console.error('No se pudieron guardar las compras', e); }
+}
+
+function buildInventarioPanel(){
+  return `
+    <div class="card">
+      <h2><span class="dot"></span>Registrar compra a proveedor</h2>
+      <p class="sub">Cuando te llega material o producto nuevo, regístralo aquí — el inventario se suma solo y se actualiza el costo por pieza.</p>
+      <div class="field"><label>Producto</label>
+        <input type="text" id="compra-producto" list="venta-producto-list" placeholder="Ej. Taza mágica 11oz">
+      </div>
+      <div class="row3">
+        <div class="field"><label>Cantidad comprada</label><input type="number" id="compra-cantidad" value="1" min="1" step="1"></div>
+        <div class="field"><label>Costo total de la compra ($)</label><input type="number" id="compra-costo-total" min="0" step="1"></div>
+        <div class="field"><label>Proveedor (opcional)</label><input type="text" id="compra-proveedor" placeholder="Ej. YOYES"></div>
+      </div>
+      <div class="actions">
+        <button class="btn" onclick="registrarCompra()">+ Registrar entrada</button>
+      </div>
+      <p class="note-line" id="compra-status"></p>
+      <div style="overflow-x:auto;margin-top:10px;">
+        <table id="compras-table">
+          <thead><tr><th>Fecha</th><th>Producto</th><th>Cant.</th><th>Costo total</th><th>Costo/pza</th><th>Proveedor</th></tr></thead>
+          <tbody id="compras-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h2><span class="dot"></span>Agregar / editar producto manualmente</h2>
+      <p class="sub">Si prefieres capturar el stock a mano en vez de registrar la compra completa.</p>
+      <div class="field"><label>Producto</label>
+        <input type="text" id="inv-producto" list="venta-producto-list" placeholder="Ej. Taza mágica 11oz">
+      </div>
+      <div class="row3">
+        <div class="field"><label>Stock actual</label><input type="number" id="inv-stock" value="0" min="0" step="1"></div>
+        <div class="field"><label>Stock mínimo (alerta)</label><input type="number" id="inv-minimo" value="5" min="0" step="1"></div>
+        <div class="field"><label>Costo por pieza $ (opcional)</label><input type="number" id="inv-costo" value="" min="0" step="0.5"></div>
+      </div>
+      <div class="actions">
+        <button class="btn" onclick="agregarInventario()">+ Agregar / actualizar</button>
+      </div>
+      <p class="note-line" id="inv-status"></p>
+    </div>
+    <div class="card">
+      <h2><span class="dot"></span>Inventario actual</h2>
+      <div class="field"><label>Buscar</label><input type="text" id="inv-search" placeholder="Filtra por producto…" oninput="renderInventarioTable()"></div>
+      <div class="stat-grid" id="inv-stats"></div>
+      <div style="overflow-x:auto;">
+        <table id="inventario-table">
+          <thead><tr><th>Producto</th><th>Stock</th><th>Mínimo</th><th>Costo/pza</th><th>Valor en stock</th><th></th></tr></thead>
+          <tbody id="inventario-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function registrarCompra(){
+  const statusEl = document.getElementById('compra-status');
+  const producto = (document.getElementById('compra-producto').value || '').trim();
+  const cantidad = parseFloat(document.getElementById('compra-cantidad').value) || 0;
+  const costoTotal = parseFloat(document.getElementById('compra-costo-total').value) || 0;
+  const proveedor = (document.getElementById('compra-proveedor').value || '').trim();
+
+  if(!producto){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Escribe el nombre del producto.</span>'; return; }
+  if(cantidad <= 0){ statusEl.innerHTML = '<span style="color:var(--red-bright)">La cantidad debe ser mayor a 0.</span>'; return; }
+
+  const costoUnit = costoTotal > 0 ? costoTotal / cantidad : 0;
+  const compras = loadCompras();
+  compras.unshift({ id: uid(), fecha: new Date().toISOString(), producto, cantidad, costoTotal, costoUnit, proveedor });
+  saveCompras(compras);
+
+  const inv = loadInventario();
+  let item = inv.find(i => normalizeName(i.producto) === normalizeName(producto));
+  if(item){
+    item.stock = (parseFloat(item.stock)||0) + cantidad;
+    if(costoUnit > 0) item.costo = costoUnit;
+  } else {
+    inv.push({ id: uid(), producto, stock: cantidad, minimo: 5, costo: costoUnit });
+  }
+  saveInventario(inv);
+
+  document.getElementById('compra-producto').value = '';
+  document.getElementById('compra-cantidad').value = '1';
+  document.getElementById('compra-costo-total').value = '';
+  document.getElementById('compra-proveedor').value = '';
+  statusEl.innerHTML = '<span style="color:var(--ok)">Entrada registrada ✓ — stock actualizado.</span>';
+  renderComprasTable();
+  renderInventarioTable();
+  populateVentaDatalist();
+}
+
+function renderComprasTable(){
+  const tbody = document.getElementById('compras-tbody');
+  if(!tbody) return;
+  const compras = loadCompras();
+  tbody.innerHTML = compras.length ? compras.map(c=>{
+    const fecha = new Date(c.fecha).toLocaleDateString('es-MX', {day:'2-digit', month:'short', year:'2-digit'});
+    return `<tr>
+      <td>${fecha}</td><td>${escapeAttr(c.producto)}</td><td>${c.cantidad}</td>
+      <td>$${(c.costoTotal||0).toFixed(2)}</td><td>$${(c.costoUnit||0).toFixed(2)}</td>
+      <td>${escapeAttr(c.proveedor||'—')}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" style="color:var(--text-dim);">Sin compras registradas todavía.</td></tr>';
+}
+
+function agregarInventario(){
+  const statusEl = document.getElementById('inv-status');
+  const producto = (document.getElementById('inv-producto').value || '').trim();
+  const stock = parseFloat(document.getElementById('inv-stock').value) || 0;
+  const minimo = parseFloat(document.getElementById('inv-minimo').value) || 0;
+  const costo = document.getElementById('inv-costo').value === '' ? null : parseFloat(document.getElementById('inv-costo').value);
+
+  if(!producto){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Escribe el nombre del producto.</span>'; return; }
+
+  const inv = loadInventario();
+  let item = inv.find(i => normalizeName(i.producto) === normalizeName(producto));
+  if(item){
+    item.stock = stock; item.minimo = minimo;
+    if(costo != null) item.costo = costo;
+  } else {
+    inv.push({ id: uid(), producto, stock, minimo, costo: costo != null ? costo : 0 });
+  }
+  saveInventario(inv);
+
+  document.getElementById('inv-producto').value = '';
+  document.getElementById('inv-stock').value = '0';
+  document.getElementById('inv-minimo').value = '5';
+  document.getElementById('inv-costo').value = '';
+  statusEl.innerHTML = '<span style="color:var(--ok)">Guardado ✓</span>';
+  renderInventarioTable();
+}
+
+function ajustarStock(id, delta){
+  const inv = loadInventario();
+  const item = inv.find(i => i.id === id);
+  if(!item) return;
+  item.stock = Math.max(0, (parseFloat(item.stock)||0) + delta);
+  saveInventario(inv);
+  renderInventarioTable();
+}
+
+function eliminarInventario(id){
+  if(!confirm('¿Eliminar este producto del inventario?')) return;
+  const inv = loadInventario().filter(i=> i.id !== id);
+  saveInventario(inv);
+  renderInventarioTable();
+}
+
+/* Actualiza el punto rojo de alerta en la pestaña "14 Inventario" cuando algo
+   está en stock bajo, para verlo sin tener que entrar al panel. */
+function actualizarAlertaInventarioTab(bajoStock){
+  const dot = document.getElementById('inv-alert-dot');
+  if(!dot) return;
+  dot.style.display = bajoStock > 0 ? 'inline-block' : 'none';
+  dot.title = bajoStock > 0 ? (bajoStock + ' producto(s) con stock bajo') : '';
+}
+
+function renderInventarioTable(){
+  const tbody = document.getElementById('inventario-tbody');
+  if(!tbody) return;
+  const searchEl = document.getElementById('inv-search');
+  const search = searchEl ? normalizeName(searchEl.value) : '';
+  const inv = loadInventario().sort((a,b)=> a.producto.localeCompare(b.producto,'es'));
+
+  let rows = '';
+  let totalValor = 0;
+  let bajoStock = 0;
+  inv.forEach(i=>{
+    const esBajoGlobal = (parseFloat(i.stock)||0) <= (parseFloat(i.minimo)||0);
+    if(esBajoGlobal) bajoStock++;
+    if(search && !normalizeName(i.producto).includes(search)) return;
+    const valor = (parseFloat(i.stock)||0) * (parseFloat(i.costo)||0);
+    totalValor += valor;
+    rows += `<tr style="${esBajoGlobal ? 'background:rgba(200,30,58,0.10);' : ''}">
+      <td>${escapeAttr(i.producto)}${esBajoGlobal ? ' <span style="color:var(--red-bright);font-size:11px;">⚠ stock bajo</span>' : ''}</td>
+      <td>
+        <button class="icon-btn" onclick="ajustarStock('${i.id}',-1)">–</button>
+        <strong style="margin:0 6px;">${i.stock}</strong>
+        <button class="icon-btn" onclick="ajustarStock('${i.id}',1)">+</button>
+      </td>
+      <td>${i.minimo}</td>
+      <td>$${(parseFloat(i.costo)||0).toFixed(2)}</td>
+      <td>$${valor.toFixed(2)}</td>
+      <td><button class="icon-btn" title="Eliminar" onclick="eliminarInventario('${i.id}')">✕</button></td>
+    </tr>`;
+  });
+
+  tbody.innerHTML = rows || '<tr><td colspan="6" style="color:var(--text-dim);">Sin productos en inventario todavía.</td></tr>';
+  actualizarAlertaInventarioTab(bajoStock);
+
+  const statsEl = document.getElementById('inv-stats');
+  if(statsEl){
+    statsEl.innerHTML = `
+      <div class="stat"><div class="label">Productos distintos</div><div class="val">${inv.length}</div></div>
+      <div class="stat"><div class="label">Piezas en existencia</div><div class="val">${inv.reduce((s,i)=> s + (parseFloat(i.stock)||0), 0)}</div></div>
+      <div class="stat"><div class="label">Valor total en stock</div><div class="val accent">${fmt2(totalValor)}</div></div>
+      <div class="stat"><div class="label">Con stock bajo</div><div class="val" style="color:${bajoStock>0?'var(--red-bright)':'var(--ok)'}">${bajoStock}</div></div>
+    `;
+  }
+  renderComprasTable();
+}
+
+/* ---------- Inicializar los tres paneles nuevos + conectarlos a sus pestañas ---------- */
+document.getElementById('panel-ventas').innerHTML = buildVentasPanel();
+document.getElementById('panel-admin').innerHTML = buildAdminPanel();
+document.getElementById('panel-inventario').innerHTML = buildInventarioPanel();
+
+populateVentaDatalist();
+renderVentasTable();
+renderAdminPanel();
+renderInventarioTable();
+
+['venta-cantidad','venta-costo','venta-precio'].forEach(id=>{
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('input', refreshVentaPreview);
+});
 
 /* ================= COTIZACIÓN DESCARGABLE (imagen tamaño carta) ================= */
 let cotItems = [];
