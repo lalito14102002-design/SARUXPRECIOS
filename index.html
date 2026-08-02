@@ -199,11 +199,20 @@
     background:var(--panel-2); border:1px solid var(--line); color:var(--text-dim);
     border-radius:20px; padding:8px 14px; font-size:11px; pointer-events:none;
   }
+  #force-update-btn{
+    position:fixed; bottom:18px; right:18px; z-index:999;
+    background:var(--red-bright); color:#fff; border:none;
+    border-radius:50%; width:54px; height:54px; font-size:22px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.45); cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #force-update-btn:active{ transform:scale(0.92); }
 </style>
 </head>
 <body>
 <button id="edit-lock-btn" onclick="toggleEditLock()">🔒 Solo consulta</button>
 <div id="cloud-status">☁️ conectando…</div>
+<button id="force-update-btn" onclick="forzarActualizacion()" title="Forzar actualización — usa esto si hiciste cambios y no se ven">🔄</button>
 <div class="wrap">
   <header>
     <div class="eyebrow">SARUX · Herramientas de producción</div>
@@ -2664,6 +2673,8 @@ function buildVentasPanel(){
         <div class="field"><label>Costo por pieza (calculadora) $</label><input type="number" id="venta-costo" value="" step="0.5" min="0"></div>
         <div class="field"><label>Precio de venta por pieza $</label><input type="number" id="venta-precio" value="" step="0.5" min="0"></div>
       </div>
+      <div class="field"><label>Gasto extra de este pedido $ (opcional)</label><input type="number" id="venta-gasto-extra" value="" step="0.5" min="0" placeholder="Ej. envío, gasolina de la entrega"></div>
+      <p class="note-line" style="margin-top:-6px;">Este gasto se resta de la ganancia solo de esta venta — es distinto de los gastos fijos mensuales de la pestaña Ganancias.</p>
       <div class="check" style="margin-top:6px;"><input type="checkbox" id="venta-descontar-inv" checked><label style="margin:0;font-family:'Inter',sans-serif;color:var(--text);font-size:13px;">Descontar del inventario si el producto existe ahí</label></div>
       <div class="field" style="margin-top:10px;"><label>Notas (opcional)</label><input type="text" id="venta-notas" placeholder="Ej. Cliente Juan, pedido de cumpleaños"></div>
       <div class="stat-grid" style="margin-top:6px;">
@@ -2681,7 +2692,7 @@ function buildVentasPanel(){
       <div style="overflow-x:auto;">
         <table id="ventas-table">
           <thead><tr>
-            <th>Fecha</th><th>Producto</th><th>Cant.</th><th>Costo/pza</th><th>Venta/pza</th><th>Ganancia</th><th></th>
+            <th>Fecha</th><th>Producto</th><th>Cant.</th><th>Costo/pza</th><th>Venta/pza</th><th>Gasto extra</th><th>Ganancia</th><th></th>
           </tr></thead>
           <tbody id="ventas-tbody"></tbody>
         </table>
@@ -2694,12 +2705,15 @@ function refreshVentaPreview(){
   const cantidad = parseFloat(document.getElementById('venta-cantidad').value) || 0;
   const costo = parseFloat(document.getElementById('venta-costo').value) || 0;
   const precio = parseFloat(document.getElementById('venta-precio').value) || 0;
+  const gastoExtra = parseFloat(document.getElementById('venta-gasto-extra').value) || 0;
   const gananciaUnit = precio - costo;
+  const gananciaTotal = gananciaUnit * cantidad - gastoExtra;
   const el1 = document.getElementById('venta-preview-unit');
   const el2 = document.getElementById('venta-preview-total');
   if(el1) el1.textContent = fmt2(gananciaUnit);
-  if(el2) el2.textContent = fmt2(gananciaUnit * cantidad);
-  [el1, el2].forEach(el=>{ if(el) el.classList.toggle('accent', gananciaUnit < 0); });
+  if(el2) el2.textContent = fmt2(gananciaTotal);
+  if(el1) el1.classList.toggle('accent', gananciaUnit < 0);
+  if(el2) el2.classList.toggle('accent', gananciaTotal < 0);
 }
 
 function registrarVenta(){
@@ -2708,17 +2722,19 @@ function registrarVenta(){
   const cantidad = parseFloat(document.getElementById('venta-cantidad').value) || 0;
   const costo = parseFloat(document.getElementById('venta-costo').value) || 0;
   const precio = parseFloat(document.getElementById('venta-precio').value) || 0;
+  const gastoExtra = parseFloat(document.getElementById('venta-gasto-extra').value) || 0;
   const notas = (document.getElementById('venta-notas').value || '').trim();
   const descontarInv = document.getElementById('venta-descontar-inv').checked;
 
   if(!producto){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Escribe el nombre del producto.</span>'; return; }
   if(cantidad <= 0){ statusEl.innerHTML = '<span style="color:var(--red-bright)">La cantidad debe ser mayor a 0.</span>'; return; }
 
-  const ganancia = (precio - costo) * cantidad;
+  const ganancia = (precio - costo) * cantidad - gastoExtra;
   const venta = {
     id: uid(),
     fecha: new Date().toISOString(),
     producto, cantidad, costo, precio,
+    gastoExtra,
     ingreso: precio * cantidad,
     ganancia,
     notas
@@ -2740,6 +2756,7 @@ function registrarVenta(){
   document.getElementById('venta-cantidad').value = '1';
   document.getElementById('venta-costo').value = '';
   document.getElementById('venta-precio').value = '';
+  document.getElementById('venta-gasto-extra').value = '';
   document.getElementById('venta-notas').value = '';
   refreshVentaPreview();
   statusEl.innerHTML = '<span style="color:var(--ok)">Venta registrada ✓ — Ganancia: ' + fmt2(ganancia) + '</span>';
@@ -2781,11 +2798,12 @@ function renderVentasTable(){
       <td>${v.cantidad}</td>
       <td>$${(v.costo||0).toFixed(2)}</td>
       <td>$${(v.precio||0).toFixed(2)}</td>
+      <td>${v.gastoExtra ? '$'+v.gastoExtra.toFixed(2) : '—'}</td>
       <td style="color:${gananciaColor};font-weight:600;">$${(v.ganancia||0).toFixed(2)}</td>
       <td><button class="icon-btn" title="Eliminar" onclick="eliminarVenta('${v.id}')">✕</button></td>
     </tr>`;
   });
-  tbody.innerHTML = rows || '<tr><td colspan="7" style="color:var(--text-dim);">Sin ventas registradas todavía.</td></tr>';
+  tbody.innerHTML = rows || '<tr><td colspan="8" style="color:var(--text-dim);">Sin ventas registradas todavía.</td></tr>';
 }
 
 /* -------------------------- GANANCIAS (ADMIN) -------------------------- */
@@ -4028,6 +4046,33 @@ if('serviceWorker' in navigator){
       .then(reg => { reg.update(); })
       .catch(e => console.error('No se pudo registrar el service worker', e));
   });
+}
+
+/* ---------- Botón "Forzar actualización" ----------
+   Cuando subes cambios nuevos y el navegador (o el Service Worker) sigue
+   mostrando la versión vieja, este botón: desregistra el Service Worker,
+   borra todo el caché de la app, y recarga la página desde cero. No borra
+   tus ventas, inventario ni nada guardado (eso vive en Supabase/localStorage,
+   no en el caché del Service Worker). */
+async function forzarActualizacion(){
+  const btn = document.getElementById('force-update-btn');
+  const original = btn ? btn.textContent : '🔄';
+  if(btn){ btn.textContent = '⏳'; btn.disabled = true; }
+  try{
+    if('serviceWorker' in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if(window.caches){
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  }catch(e){
+    console.error('No se pudo limpiar el Service Worker / caché', e);
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.set('_upd', Date.now());
+  window.location.replace(url.toString());
 }
 
 </script>
