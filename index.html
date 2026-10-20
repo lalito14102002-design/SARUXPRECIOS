@@ -3419,10 +3419,11 @@ function buildCotizacionPanel(){
 
     <div class="card">
       <h2><span class="dot"></span>Agregar producto libre (lo escribo yo)</h2>
-      <p class="sub">Para cualquier cosa que no esté en la lista: tú pones el nombre, el precio por pieza y la cantidad. Sin tablas de descuento ni cálculos, se cotiza exactamente con tu precio.</p>
+      <p class="sub">Para cualquier cosa que no esté en la lista: tú pones el nombre y los precios. Si le dejas un precio menor al normal, el ahorro se calcula solo y sale en la cotización.</p>
       <div class="field"><label>Descripción</label><input type="text" id="cot-free-name" placeholder="Ej. Papel picado día de muertos"></div>
-      <div class="row2">
-        <div class="field"><label>Precio por pieza ($)</label><input type="number" id="cot-free-price" inputmode="decimal" step="0.01" min="0" placeholder="0.00"></div>
+      <div class="row3">
+        <div class="field"><label>Precio normal por pza ($) — opcional</label><input type="number" id="cot-free-normal" inputmode="decimal" step="0.01" min="0" placeholder="Ej. 60"></div>
+        <div class="field"><label>Precio que le dejas por pza ($)</label><input type="number" id="cot-free-price" inputmode="decimal" step="0.01" min="0" placeholder="Ej. 50"></div>
         <div class="field"><label>Cantidad</label><input type="number" id="cot-free-qty" inputmode="numeric" value="1" step="1" min="1"></div>
       </div>
       <div class="actions"><button class="btn ghost small" onclick="addFreeCotItem()">+ Agregar producto libre</button></div>
@@ -3548,38 +3549,55 @@ function addCotItem(){
   renderCotItems();
 }
 
-/* Producto libre: el nombre, precio y cantidad los escribe el usuario. Sin descuento de mayoreo ni cálculo de costos. */
+/* Producto libre: nombre, precio normal (opcional) y precio que se le deja los escribe el usuario.
+   Si el precio normal es mayor al que se le deja, la diferencia se muestra como ahorro. */
+function recalcFreeItem(it){
+  const oferta = it.priceBulk;
+  const normal = it.priceUnit > oferta ? it.priceUnit : oferta;
+  it.priceUnit = normal;
+  it.savingsUnit = normal - oferta;
+  it.savingsPct = normal > 0 ? (it.savingsUnit / normal) * 100 : 0;
+  it.savingsTotal = it.savingsUnit * it.qty;
+  it.totalBulk = oferta * it.qty;
+}
+
 function addFreeCotItem(){
   const statusEl = document.getElementById('cot-status');
   const name = (document.getElementById('cot-free-name').value || '').trim();
   const price = parseFloat(document.getElementById('cot-free-price').value);
+  const normalRaw = document.getElementById('cot-free-normal').value;
+  const normal = normalRaw === '' ? NaN : parseFloat(normalRaw);
   const qty = parseInt(document.getElementById('cot-free-qty').value) || 0;
   if(!name){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Escribe la descripción del producto.</span>'; return; }
-  if(!(price>=0) || isNaN(price)){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Pon el precio por pieza.</span>'; return; }
+  if(isNaN(price) || price<0){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Pon el precio que le dejas por pieza.</span>'; return; }
   if(qty<=0){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Pon una cantidad válida.</span>'; return; }
-  cotItems.push({
+  const it = {
     name, qty,
-    priceUnit: price, priceBulk: price,
+    priceUnit: isNaN(normal) ? price : normal,
+    priceBulk: price,
     savingsPct: 0, savingsUnit: 0, savingsTotal: 0,
-    totalBulk: price*qty,
+    totalBulk: 0,
     calcInputs: null,
     manual: true
-  });
+  };
+  recalcFreeItem(it);
+  cotItems.push(it);
   document.getElementById('cot-free-name').value = '';
+  document.getElementById('cot-free-normal').value = '';
   document.getElementById('cot-free-price').value = '';
   document.getElementById('cot-free-qty').value = '1';
   statusEl.innerHTML = '';
   renderCotItems();
 }
 
-/* Cambiar el precio de un producto libre directamente en la tabla. */
-function updateCotItemPrice(i, newPriceStr){
+/* Cambiar precio normal o precio que se le deja de un producto libre, directo en la tabla. */
+function updateCotItemPrice(i, which, newPriceStr){
   const it = cotItems[i];
   if(!it || !it.manual) return;
   const p = parseFloat(newPriceStr);
   if(isNaN(p) || p<0){ renderCotItems(); return; }
-  it.priceUnit = p; it.priceBulk = p;
-  it.totalBulk = p*it.qty;
+  if(which === 'normal') it.priceUnit = p; else it.priceBulk = p;
+  recalcFreeItem(it);
   renderCotItems();
 }
 
@@ -3641,6 +3659,9 @@ function updateCotItemQty(i, newQtyStr){
     it.savingsUnit = r.ahorroUnit;
     it.savingsTotal = r.ahorroTotal;
     it.totalBulk = r.precioTotal;
+  } else if(it.manual){
+    it.qty = qty;
+    recalcFreeItem(it);
   } else {
     // Cotización reutilizada de antes de esta actualización: sin datos para recalcular a fondo,
     // así que solo se escala el total con el precio de mayoreo que ya tenía.
@@ -3658,7 +3679,7 @@ function renderCotItems(){
       <td>${escapeAttr(it.name)}</td>
       <td><input type="number" value="${it.qty}" min="1" step="1" style="width:70px;" onchange="updateCotItemQty(${i}, this.value)"></td>
       ${it.manual
-        ? `<td colspan="2"><input type="number" value="${it.priceUnit}" min="0" step="0.01" style="width:90px;" onchange="updateCotItemPrice(${i}, this.value)"></td>`
+        ? `<td><input type="number" value="${it.priceUnit}" min="0" step="0.01" style="width:80px;" onchange="updateCotItemPrice(${i}, 'normal', this.value)"></td><td><input type="number" value="${it.priceBulk}" min="0" step="0.01" style="width:80px;" onchange="updateCotItemPrice(${i}, 'oferta', this.value)"></td>`
         : `<td>$${it.priceUnit.toFixed(2)}</td><td>$${it.priceBulk.toFixed(2)}</td>`}
       <td>${it.savingsPct.toFixed(1)}%</td>
       <td><button class="icon-btn" onclick="removeCotItem(${i})">×</button></td>
