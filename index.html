@@ -300,10 +300,30 @@
         </div>
 
         <div class="card">
-          <h2><span class="dot"></span>Contacto en tus cotizaciones</h2>
-          <p class="sub">Este teléfono/WhatsApp aparece impreso en la imagen de la cotización, para que quien la reciba (aunque se la reenvíen) sepa cómo contactarte.</p>
-          <div class="field"><label>Teléfono / WhatsApp</label><input type="text" id="cot-phone-input" placeholder="Ej. WhatsApp 222 123 4567" oninput="saveCotPhone()"></div>
-          <p class="note-line" id="cot-phone-status"></p>
+          <h2><span class="dot"></span>Datos de tu negocio (salen en las cotizaciones)</h2>
+          <p class="sub">Llena solo lo que quieras mostrar; lo que dejes vacío no aparece. El teléfono sale en el encabezado y las redes y el correo en el pie de cada cotización.</p>
+          <div class="field"><label>Teléfono / WhatsApp</label><input type="text" id="cot-phone-input" placeholder="Ej. 222 123 4567" oninput="saveCotPhone()"></div>
+          <div class="row2">
+            <div class="field"><label>Instagram</label><input type="text" id="biz-ig" placeholder="@tuusuario" oninput="saveBizInfo()"></div>
+            <div class="field"><label>Facebook</label><input type="text" id="biz-fb" placeholder="Nombre de tu página" oninput="saveBizInfo()"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>TikTok</label><input type="text" id="biz-tt" placeholder="@tuusuario" oninput="saveBizInfo()"></div>
+            <div class="field"><label>Correo</label><input type="text" id="biz-email" placeholder="correo@ejemplo.com" oninput="saveBizInfo()"></div>
+          </div>
+          <div class="field"><label>Sitio web / catálogo (opcional)</label><input type="text" id="biz-web" placeholder="Ej. saruxcatalogo.pages.dev" oninput="saveBizInfo()"></div>
+        </div>
+
+        <div class="card">
+          <h2><span class="dot"></span>Datos de pago (cuenta bancaria)</h2>
+          <p class="sub">Salen en un recuadro de la cotización para que el cliente sepa dónde depositar. En cada cotización puedes decidir si se muestran o no. Para transferencias basta la CLABE.</p>
+          <div class="row2">
+            <div class="field"><label>Banco</label><input type="text" id="biz-bank" placeholder="Ej. BBVA" oninput="saveBizInfo()"></div>
+            <div class="field"><label>Titular</label><input type="text" id="biz-holder" placeholder="Nombre completo del titular" oninput="saveBizInfo()"></div>
+          </div>
+          <div class="field"><label>CLABE (18 dígitos)</label><input type="text" id="biz-clabe" inputmode="numeric" placeholder="000000000000000000" oninput="saveBizInfo()"></div>
+          <div class="field"><label>No. de tarjeta o cuenta (opcional)</label><input type="text" id="biz-account" inputmode="numeric" placeholder="Solo si también recibes depósitos en tienda" oninput="saveBizInfo()"></div>
+          <p class="note-line" id="biz-status"></p>
         </div>
       </div>
     </div>
@@ -1464,6 +1484,7 @@ function exportBackup(){
     savedQuotes: JSON.parse(localStorage.getItem(SAVED_QUOTES_KEY) || '[]'),
     logo: localStorage.getItem(LOGO_KEY) || null,
     cotPhone: localStorage.getItem(COT_PHONE_KEY) || '',
+    bizInfo: JSON.parse(localStorage.getItem(BIZ_INFO_KEY) || '{}'),
     customCategories: JSON.parse(localStorage.getItem(CUSTOM_CATEGORIES_KEY) || '[]'),
     priceOverrides: JSON.parse(localStorage.getItem(PRICE_OVERRIDES_KEY) || '{"supplier":{},"otros":{}}'),
     almohadasSettings: JSON.parse(localStorage.getItem('sarux_almohadas_settings_v1') || 'null'),
@@ -1513,6 +1534,7 @@ function importBackupFile(event){
       if(backup.savedQuotes) localStorage.setItem(SAVED_QUOTES_KEY, JSON.stringify(backup.savedQuotes));
       if(backup.logo) localStorage.setItem(LOGO_KEY, backup.logo);
       if(backup.cotPhone != null) localStorage.setItem(COT_PHONE_KEY, backup.cotPhone);
+      if(backup.bizInfo) localStorage.setItem(BIZ_INFO_KEY, JSON.stringify(backup.bizInfo));
       if(backup.customCategories) localStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify(backup.customCategories));
       if(backup.priceOverrides) localStorage.setItem(PRICE_OVERRIDES_KEY, JSON.stringify(backup.priceOverrides));
       if(backup.almohadasSettings) localStorage.setItem('sarux_almohadas_settings_v1', JSON.stringify(backup.almohadasSettings));
@@ -1623,7 +1645,7 @@ function uploadLogo(event){
   const reader = new FileReader();
   reader.onload = async function(e){
     try{
-      const resized = await resizeImageDataUrl(e.target.result, 500);
+      const resized = await resizeImageDataUrl(e.target.result, 800);
       localStorage.setItem(LOGO_KEY, resized);
       if(statusEl) statusEl.innerHTML = '<span style="color:var(--ok)">✔ Logo guardado</span>';
     }catch(err){
@@ -1668,8 +1690,35 @@ function saveCotPhone(){
 }
 function renderCotPhonePreview(){
   const input = document.getElementById('cot-phone-input');
-  if(!input) return;
-  input.value = localStorage.getItem(COT_PHONE_KEY) || '';
+  if(input) input.value = localStorage.getItem(COT_PHONE_KEY) || '';
+  const biz = getBizInfo();
+  const map = {ig:'biz-ig', fb:'biz-fb', tt:'biz-tt', email:'biz-email', web:'biz-web', bank:'biz-bank', holder:'biz-holder', clabe:'biz-clabe', account:'biz-account'};
+  Object.keys(map).forEach(k=>{ const el = document.getElementById(map[k]); if(el) el.value = biz[k] || ''; });
+}
+
+/* ---------- Datos del negocio y de pago (para las cotizaciones) ---------- */
+const BIZ_INFO_KEY = 'sarux_biz_info';
+function getBizInfo(){
+  try{ return JSON.parse(localStorage.getItem(BIZ_INFO_KEY) || '{}') || {}; }catch(e){ return {}; }
+}
+let __bizSaveTimer = null;
+function saveBizInfo(){
+  clearTimeout(__bizSaveTimer);
+  __bizSaveTimer = setTimeout(function(){
+    const ids = {ig:'biz-ig', fb:'biz-fb', tt:'biz-tt', email:'biz-email', web:'biz-web', bank:'biz-bank', holder:'biz-holder', clabe:'biz-clabe', account:'biz-account'};
+    const o = {};
+    Object.keys(ids).forEach(k=>{ const el = document.getElementById(ids[k]); o[k] = el ? (el.value || '').trim() : ''; });
+    const statusEl = document.getElementById('biz-status');
+    try{
+      localStorage.setItem(BIZ_INFO_KEY, JSON.stringify(o));
+      const digits = o.clabe.replace(/\D/g,'');
+      if(o.clabe && digits.length !== 18){
+        if(statusEl) statusEl.innerHTML = '<span style="color:var(--red-bright)">Guardado, pero la CLABE debe tener 18 dígitos (llevas ' + digits.length + ').</span>';
+      } else {
+        if(statusEl) statusEl.innerHTML = '<span style="color:var(--ok)">✓ Guardado</span>';
+      }
+    }catch(e){ console.error('No se pudieron guardar los datos del negocio', e); }
+  }, 600);
 }
 
 function getCatalogArrayFor(id){
@@ -3403,6 +3452,11 @@ function buildCotizacionPanel(){
         <div class="field"><label>Concepto</label><input type="text" id="cot-concept" placeholder="Ej. Playeras para evento X"></div>
       </div>
       <div class="field"><label>Margen deseado (%)</label><input type="number" id="cot-margin" value="40" step="1"></div>
+      <div class="row3">
+        <div class="field"><label>Anticipo (%) — 0 para no mostrar</label><input type="number" id="cot-anticipo" value="50" min="0" max="100" step="5"></div>
+        <div class="field"><label>Vigencia (días)</label><input type="number" id="cot-vigencia" value="15" min="0" step="1"></div>
+        <div class="field"><label>Datos de pago</label><div class="check" style="margin-top:8px;"><input type="checkbox" id="cot-show-payment" checked><label style="margin:0;font-family:'Inter',sans-serif;color:var(--text);font-size:13px;">Incluir en la cotización</label></div></div>
+      </div>
     </div>
 
     <div class="card">
@@ -3442,7 +3496,9 @@ function buildCotizacionPanel(){
 
     <div class="card">
       <h2><span class="dot"></span>Términos y condiciones</h2>
-      <textarea id="cot-terms" rows="4" style="width:100%;background:#0d0d10;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 12px;font-family:'Inter',sans-serif;font-size:13px;">Precios sujetos a cambio sin previo aviso. Cotización válida por 15 días. Se requiere el 50% de anticipo para iniciar producción. Tiempo de entrega a confirmar según cantidad y disponibilidad.</textarea>
+      <textarea id="cot-terms" rows="4" style="width:100%;background:#0d0d10;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 12px;font-family:'Inter',sans-serif;font-size:13px;">Precios sujetos a cambio sin previo aviso.
+Se requiere el anticipo indicado para iniciar producción.
+Tiempo de entrega a confirmar según cantidad y disponibilidad.</textarea>
     </div>
 
     <div class="card">
@@ -3721,11 +3777,15 @@ async function previewQuoteImage(){
   const now = new Date();
   const totalBulk = cotItems.reduce((s,it)=>s+it.totalBulk,0);
   const totalSavings = cotItems.reduce((s,it)=>s+it.savingsTotal,0);
+  const anticipoPct = Math.min(100, Math.max(0, parseFloat(document.getElementById('cot-anticipo').value) || 0));
+  const vigenciaDays = Math.max(0, parseInt(document.getElementById('cot-vigencia').value) || 0);
+  const showPayment = document.getElementById('cot-show-payment').checked;
 
   const quoteData = {
     number: null, dateISO: now.toISOString(), client, concept,
     items: cotItems.map(it=>({...it})),
-    totalBulk, totalSavings, terms, confirmed: false
+    totalBulk, totalSavings, terms, confirmed: false,
+    anticipoPct, vigenciaDays, showPayment
   };
   currentQuoteData = quoteData;
 
@@ -3866,28 +3926,80 @@ function loadImagePromise(src){
   });
 }
 
+/* ---- Ayudas de dibujo para la cotización ---- */
+const QUOTE_ACRONYMS = ['DTF','A4','PDF','UV','MDF','LED','RGB','XS','XL','XXL','CM','ML','OZ','USB','PVC','PET','MM'];
+function prettyQuoteName(name){
+  const n = (name || '').trim();
+  if(!n || n !== n.toUpperCase() || n === n.toLowerCase()) return n;
+  let first = true;
+  return n.toLowerCase().split(/(\s+)/).map(function(w){
+    if(w === '' || /^\s+$/.test(w)) return w;
+    const up = w.toUpperCase();
+    if(QUOTE_ACRONYMS.indexOf(up) >= 0){ first = false; return up; }
+    if(first){ first = false; return w.charAt(0).toUpperCase() + w.slice(1); }
+    return w;
+  }).join('');
+}
+function quoteMoney(n){
+  return '$' + (Number(n) || 0).toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function fitCanvasLine(ctx, text, maxW){
+  if(ctx.measureText(text).width <= maxW) return text;
+  let t = text;
+  while(t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1);
+  return t.replace(/\s+$/,'') + '…';
+}
+function wrapLinesCanvas(ctx, text, maxW, maxLines){
+  const words = (text || '').split(/\s+/).filter(Boolean);
+  let lines = [];
+  let line = '';
+  words.forEach(function(w){
+    const test = line ? line + ' ' + w : w;
+    if(ctx.measureText(test).width > maxW && line){ lines.push(line); line = w; }
+    else line = test;
+  });
+  if(line) lines.push(line);
+  if(lines.length > maxLines){
+    const last = lines.slice(maxLines - 1).join(' ');
+    lines = lines.slice(0, maxLines - 1);
+    lines.push(fitCanvasLine(ctx, last, maxW));
+  }
+  return lines.map(function(l){ return fitCanvasLine(ctx, l, maxW); });
+}
+function bizHandle(v){
+  v = (v || '').trim();
+  if(!v) return '';
+  return (v.charAt(0) === '@' || v.indexOf('/') >= 0) ? v : '@' + v;
+}
+function formatClabe(v){
+  const d = (v || '').replace(/\D/g,'');
+  return d.length === 18 ? d.replace(/(\d{4})(?=\d)/g, '$1 ') : (v || '');
+}
+
 async function drawQuoteToCanvas(q){
   /* Se dibuja primero sobre un lienzo temporal generosamente alto, y al final
      se recorta el canvas visible exactamente a donde terminó el contenido —
      así nunca queda un bloque de espacio en blanco después del pie de página. */
   const W = 1700;
   const M = 70;
-  const MAXH = 2600;
+  const MAXH = 3200;
   const off = document.createElement('canvas');
   off.width = W; off.height = MAXH;
   const ctx = off.getContext('2d');
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0,0,W,MAXH);
 
+  const biz = getBizInfo();
   let y = M;
 
   const logoDataUrl = localStorage.getItem(LOGO_KEY);
   const logoImg = logoDataUrl ? await loadImagePromise(logoDataUrl) : null;
 
+  /* ----- Encabezado ----- */
   ctx.textAlign = 'left';
   let logoBlockH = 0;
   if(logoImg){
-    const maxLogoH = 150, maxLogoW = 460;
+    const maxLogoH = 190, maxLogoW = 560;
     let lw = logoImg.width, lh = logoImg.height;
     const scale = Math.min(maxLogoW/lw, maxLogoH/lh, 1);
     lw *= scale; lh *= scale;
@@ -3911,19 +4023,26 @@ async function drawQuoteToCanvas(q){
   ctx.fillStyle = '#444';
   ctx.fillText(q.number ? ('COT-'+String(q.number).padStart(4,'0')) : 'BORRADOR — sin folio', W-M, y+48);
   const d = new Date(q.dateISO);
-  const fecha = d.toLocaleDateString('es-MX', {year:'numeric', month:'long', day:'numeric'});
-  const hora = d.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'});
+  const dateOpts = {year:'numeric', month:'long', day:'numeric'};
   ctx.font = "500 22px 'JetBrains Mono', monospace";
-  ctx.fillText(fecha+' · '+hora, W-M, y+78);
-
+  let ry = y + 78;
+  ctx.fillText(d.toLocaleDateString('es-MX', dateOpts), W-M, ry);
+  if(q.vigenciaDays > 0){
+    const until = new Date(d.getTime());
+    until.setDate(until.getDate() + q.vigenciaDays);
+    ry += 30;
+    ctx.fillStyle = '#444';
+    ctx.fillText('Válida hasta el ' + until.toLocaleDateString('es-MX', dateOpts), W-M, ry);
+  }
   const contactPhone = (localStorage.getItem(COT_PHONE_KEY) || '').trim();
-  let headerRightH = 78;
   if(contactPhone){
+    ry += 32;
     ctx.font = "600 24px 'JetBrains Mono', monospace";
     ctx.fillStyle = '#0a0a0c';
-    ctx.fillText(contactPhone, W-M, y+108);
-    headerRightH = 108;
+    const phoneTxt = /[a-zA-Z]/.test(contactPhone) ? contactPhone : ('WhatsApp: ' + contactPhone);
+    ctx.fillText(phoneTxt, W-M, ry);
   }
+  const headerRightH = ry - y + 6;
   ctx.textAlign = 'left';
 
   y += Math.max(logoBlockH, headerRightH) + 26;
@@ -3943,6 +4062,8 @@ async function drawQuoteToCanvas(q){
     y += 10;
   }
 
+  /* ----- Tabla de productos ----- */
+  const hasSavings = q.items.some(function(it){ return (it.savingsTotal || 0) > 0.004; });
   y += 22;
   const colX = [M, M+660, M+920, M+1200, W-M];
   ctx.fillStyle = '#0a0a0c';
@@ -3952,79 +4073,216 @@ async function drawQuoteToCanvas(q){
   ctx.textAlign = 'left';
   ctx.fillText('PRODUCTO', colX[0]+18, y+38);
   ctx.fillText('CANT.', colX[1], y+38);
-  ctx.fillText('P/PZA', colX[2], y+38);
-  ctx.fillText('P/MAYOREO', colX[3], y+38);
+  if(hasSavings){
+    ctx.fillText('P. NORMAL', colX[2], y+38);
+    ctx.fillText('P. ESPECIAL', colX[3], y+38);
+  } else {
+    ctx.fillText('PRECIO / PZA', colX[3], y+38);
+  }
   ctx.textAlign = 'right';
-  ctx.fillText('TOTAL', colX[4], y+38);
+  ctx.fillText('TOTAL', colX[4]-18, y+38);
   ctx.textAlign = 'left';
   y += 58;
 
   const itemCount = Math.max(q.items.length,1);
   const rowH = itemCount<=8 ? 66 : itemCount<=14 ? 54 : itemCount<=20 ? 44 : 36;
-  const nameFont = rowH < 44 ? "400 18px 'Inter', sans-serif" : "400 24px 'Inter', sans-serif";
-  const numFont = rowH < 44 ? "500 18px 'Inter', sans-serif" : "500 24px 'Inter', sans-serif";
+  const small = rowH < 44;
+  const nameFont = small ? "400 18px 'Inter', sans-serif" : "400 24px 'Inter', sans-serif";
+  const numFont = small ? "500 18px 'Inter', sans-serif" : "500 24px 'Inter', sans-serif";
+  const lineH = small ? 24 : 30;
+  const nameMaxW = colX[1] - colX[0] - 18 - 30;
 
-  q.items.forEach((it,i)=>{
+  q.items.forEach(function(it,i){
+    ctx.font = nameFont;
+    const lines = wrapLinesCanvas(ctx, prettyQuoteName(it.name), nameMaxW, 2);
+    const rh = rowH + (lines.length > 1 ? lineH : 0);
     if(i % 2 === 1){
       ctx.fillStyle = '#f4f2ef';
-      ctx.fillRect(M, y, W-2*M, rowH);
+      ctx.fillRect(M, y, W-2*M, rh);
     }
-    const maxChars = rowH < 44 ? 46 : 38;
-    const name = it.name.length > maxChars ? it.name.slice(0,maxChars-1)+'…' : it.name;
+    ctx.fillStyle = '#0a0a0c';
+    ctx.textAlign = 'left';
     ctx.font = nameFont;
-    ctx.fillStyle = '#0a0a0c';
-    ctx.textAlign = 'left';
-    ctx.fillText(name, colX[0]+18, y+rowH/2+8);
+    const textH = lines.length * lineH;
+    const by = y + (rh - textH)/2 + lineH*0.78;
+    lines.forEach(function(ln,k){ ctx.fillText(ln, colX[0]+18, by + k*lineH); });
+    const cy = y + rh/2 + 8;
     ctx.font = numFont;
-    ctx.fillText(String(it.qty), colX[1], y+rowH/2+8);
-    ctx.fillText('$'+it.priceUnit.toFixed(2), colX[2], y+rowH/2+8);
-    ctx.fillStyle = '#c81e3a';
-    ctx.fillText('$'+it.priceBulk.toFixed(2), colX[3], y+rowH/2+8);
+    ctx.fillText(String(it.qty), colX[1], cy);
+    if(hasSavings){
+      ctx.fillStyle = '#888';
+      if((it.savingsTotal || 0) > 0.004){
+        const t = quoteMoney(it.priceUnit);
+        ctx.fillText(t, colX[2], cy);
+        const tw = ctx.measureText(t).width;
+        ctx.strokeStyle = '#888'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(colX[2], cy-8); ctx.lineTo(colX[2]+tw, cy-8); ctx.stroke();
+        ctx.fillStyle = '#c81e3a';
+      } else {
+        ctx.fillText('—', colX[2], cy);
+        ctx.fillStyle = '#0a0a0c';
+      }
+      ctx.fillText(quoteMoney(it.priceBulk), colX[3], cy);
+    } else {
+      ctx.fillStyle = '#0a0a0c';
+      ctx.fillText(quoteMoney(it.priceBulk), colX[3], cy);
+    }
     ctx.fillStyle = '#0a0a0c';
-    ctx.font = rowH < 44 ? "700 18px 'Inter', sans-serif" : "700 24px 'Inter', sans-serif";
+    ctx.font = small ? "700 18px 'Inter', sans-serif" : "700 24px 'Inter', sans-serif";
     ctx.textAlign = 'right';
-    ctx.fillText('$'+it.totalBulk.toFixed(2), colX[4], y+rowH/2+8);
+    ctx.fillText(quoteMoney(it.totalBulk), colX[4]-18, cy);
     ctx.textAlign = 'left';
-    y += rowH;
+    y += rh;
   });
 
   y += 18;
   ctx.strokeStyle = '#ddd';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(M,y); ctx.lineTo(W-M,y); ctx.stroke();
-  y += 52;
+  y += 50;
 
+  /* ----- Totales ----- */
+  const total = q.totalBulk;
+  const savingsTotal = q.items.reduce(function(s,it){ return s + (it.savingsTotal || 0); }, 0);
+  const labelX = W-M-320;
   ctx.textAlign = 'right';
-  ctx.fillStyle = '#333';
-  ctx.font = "600 26px 'Inter', sans-serif";
-  ctx.fillText('Total mayoreo:', W-M-280, y);
-  ctx.font = "700 36px 'Space Grotesk', sans-serif";
+  if(hasSavings){
+    ctx.font = "500 24px 'Inter', sans-serif";
+    ctx.fillStyle = '#777';
+    ctx.fillText('Total a precio normal:', labelX, y);
+    ctx.fillText(quoteMoney(total + savingsTotal), W-M, y);
+    y += 44;
+    ctx.font = "600 26px 'Inter', sans-serif";
+    ctx.fillStyle = '#1f8a4c';
+    ctx.fillText('Ahorras en total:', labelX, y);
+    ctx.font = "700 30px 'Space Grotesk', sans-serif";
+    ctx.fillText('-' + quoteMoney(savingsTotal), W-M, y);
+    y += 58;
+  }
+  ctx.font = "700 30px 'Inter', sans-serif";
   ctx.fillStyle = '#0a0a0c';
-  ctx.fillText('$'+q.totalBulk.toFixed(2), W-M, y);
-  y += 52;
-  ctx.font = "600 26px 'Inter', sans-serif";
-  ctx.fillStyle = '#1f8a4c';
-  ctx.fillText('Ahorras en total:', W-M-280, y);
-  ctx.font = "700 36px 'Space Grotesk', sans-serif";
-  ctx.fillText('$'+q.totalSavings.toFixed(2), W-M, y);
+  ctx.fillText('TOTAL:', labelX, y);
+  ctx.font = "700 46px 'Space Grotesk', sans-serif";
+  ctx.fillText(quoteMoney(total), W-M, y);
   ctx.textAlign = 'left';
+  y += 34;
 
-  y += 60;
+  /* ----- Anticipo y saldo ----- */
+  if(q.anticipoPct > 0 && total > 0){
+    const pct = Math.min(100, q.anticipoPct);
+    const anticipo = total * pct / 100;
+    const saldo = total - anticipo;
+    const boxH = 104;
+    y += 14;
+    ctx.fillStyle = '#f7f5f2';
+    ctx.fillRect(M, y, W-2*M, boxH);
+    ctx.fillStyle = '#c81e3a';
+    ctx.fillRect(M, y, 8, boxH);
+    const half = (W-2*M)/2;
+    ctx.fillStyle = '#777';
+    ctx.font = "500 22px 'Inter', sans-serif";
+    ctx.fillText('Anticipo (' + String(+pct.toFixed(1)) + '%) para iniciar producción', M+34, y+36);
+    ctx.fillText('Saldo restante', M+half+34, y+36);
+    ctx.fillStyle = '#0a0a0c';
+    ctx.font = "700 36px 'Space Grotesk', sans-serif";
+    ctx.fillText(quoteMoney(anticipo), M+34, y+82);
+    ctx.fillText(quoteMoney(saldo), M+half+34, y+82);
+    y += boxH + 6;
+  }
+
+  /* ----- Datos de pago ----- */
+  if(q.showPayment === true){
+    const cells = [
+      ['Banco', biz.bank],
+      ['Titular', biz.holder],
+      ['CLABE', formatClabe(biz.clabe)],
+      ['Cuenta / Tarjeta', biz.account]
+    ].filter(function(c){ return c[1]; });
+    if(cells.length){
+      const rows = Math.ceil(cells.length / 2);
+      const boxH = 28 + 42 + rows*76 + 6;
+      y += 30;
+      ctx.fillStyle = '#f7f5f2';
+      ctx.fillRect(M, y, W-2*M, boxH);
+      ctx.fillStyle = '#c81e3a';
+      ctx.fillRect(M, y, 8, boxH);
+      ctx.fillStyle = '#0a0a0c';
+      ctx.font = "700 26px 'Inter', sans-serif";
+      ctx.fillText('Datos de pago', M+34, y+46);
+      const half = (W-2*M)/2;
+      cells.forEach(function(c,k){
+        const cx = M + 34 + (k % 2) * half;
+        const cyy = y + 46 + 40 + Math.floor(k/2) * 76;
+        ctx.fillStyle = '#888';
+        ctx.font = "500 20px 'JetBrains Mono', monospace";
+        ctx.fillText(c[0].toUpperCase(), cx, cyy);
+        ctx.fillStyle = '#0a0a0c';
+        ctx.font = "600 28px 'Inter', sans-serif";
+        ctx.fillText(c[1], cx, cyy + 34, half - 60);
+      });
+      y += boxH;
+    }
+  }
+
+  /* ----- Términos y condiciones (en lista) ----- */
+  y += 56;
   ctx.fillStyle = '#0a0a0c';
   ctx.font = "700 26px 'Inter', sans-serif";
   ctx.fillText('Términos y condiciones', M, y);
-  y += 36;
-  ctx.font = "400 21px 'Inter', sans-serif";
-  ctx.fillStyle = '#555';
-  y = wrapCanvasText(ctx, q.terms || '', M, y, W-2*M, 29);
+  y += 38;
+  let termLines = (q.terms || '').split(/\n+/).map(function(t){ return t.trim(); }).filter(Boolean);
+  if(termLines.length === 1){
+    const sentences = termLines[0].match(/[^.!?]+[.!?]+|[^.!?]+$/g);
+    if(sentences) termLines = sentences.map(function(t){ return t.trim(); }).filter(Boolean);
+  }
+  ctx.font = "400 22px 'Inter', sans-serif";
+  termLines.forEach(function(t){
+    const wrapped = wrapLinesCanvas(ctx, t, W-2*M-34, 6);
+    ctx.fillStyle = '#c81e3a';
+    ctx.fillText('•', M+4, y);
+    ctx.fillStyle = '#555';
+    wrapped.forEach(function(ln){
+      ctx.fillText(ln, M+34, y);
+      y += 31;
+    });
+    y += 5;
+  });
 
-  y += 44;
-  ctx.fillStyle = '#999';
-  ctx.font = "400 18px 'JetBrains Mono', monospace";
-  ctx.fillText('Generado el '+new Date().toLocaleString('es-MX'), M, y);
+  /* ----- Pie de página ----- */
+  y += 20;
+  ctx.strokeStyle = '#ddd';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(M,y); ctx.lineTo(W-M,y); ctx.stroke();
+  y += 52;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#0a0a0c';
+  ctx.font = "700 28px 'Inter', sans-serif";
+  ctx.fillText('¡Gracias por tu preferencia!', W/2, y);
+  const contacts = [];
+  if(biz.ig) contacts.push('Instagram ' + bizHandle(biz.ig));
+  if(biz.fb) contacts.push('Facebook ' + biz.fb);
+  if(biz.tt) contacts.push('TikTok ' + bizHandle(biz.tt));
+  if(biz.email) contacts.push(biz.email);
+  if(biz.web) contacts.push(biz.web);
+  if(contacts.length){
+    ctx.font = "500 22px 'Inter', sans-serif";
+    ctx.fillStyle = '#555';
+    const sep = '   ·   ';
+    let line = '';
+    contacts.forEach(function(c){
+      const test = line ? line + sep + c : c;
+      if(ctx.measureText(test).width > W-2*M && line){
+        y += 38;
+        ctx.fillText(line, W/2, y);
+        line = c;
+      } else line = test;
+    });
+    if(line){ y += 38; ctx.fillText(line, W/2, y); }
+  }
+  ctx.textAlign = 'left';
 
   /* Recorta el canvas visible al alto real del contenido (con un pequeño margen inferior) */
-  const finalH = Math.min(Math.max(y + M - 10, 700), MAXH);
+  const finalH = Math.min(Math.max(y + M, 700), MAXH);
   const canvas = document.getElementById('cot-canvas');
   canvas.width = W;
   canvas.height = finalH;
@@ -4073,6 +4331,9 @@ function reuseSavedQuote(i){
   document.getElementById('cot-client').value = q.client || '';
   document.getElementById('cot-concept').value = q.concept || '';
   document.getElementById('cot-terms').value = q.terms || '';
+  if(q.anticipoPct != null) document.getElementById('cot-anticipo').value = q.anticipoPct;
+  if(q.vigenciaDays != null) document.getElementById('cot-vigencia').value = q.vigenciaDays;
+  if(q.showPayment != null) document.getElementById('cot-show-payment').checked = !!q.showPayment;
   cotItems = q.items.map(it=>({...it}));
   renderCotItems();
 
