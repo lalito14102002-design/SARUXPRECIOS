@@ -3418,6 +3418,17 @@ function buildCotizacionPanel(){
     </div>
 
     <div class="card">
+      <h2><span class="dot"></span>Agregar producto libre (lo escribo yo)</h2>
+      <p class="sub">Para cualquier cosa que no esté en la lista: tú pones el nombre, el precio por pieza y la cantidad. Sin tablas de descuento ni cálculos, se cotiza exactamente con tu precio.</p>
+      <div class="field"><label>Descripción</label><input type="text" id="cot-free-name" placeholder="Ej. Papel picado día de muertos"></div>
+      <div class="row2">
+        <div class="field"><label>Precio por pieza ($)</label><input type="number" id="cot-free-price" inputmode="decimal" step="0.01" min="0" placeholder="0.00"></div>
+        <div class="field"><label>Cantidad</label><input type="number" id="cot-free-qty" inputmode="numeric" value="1" step="1" min="1"></div>
+      </div>
+      <div class="actions"><button class="btn ghost small" onclick="addFreeCotItem()">+ Agregar producto libre</button></div>
+    </div>
+
+    <div class="card">
       <h2><span class="dot"></span>Productos de la cotización</h2>
       <div style="overflow-x:auto;">
         <table>
@@ -3537,6 +3548,41 @@ function addCotItem(){
   renderCotItems();
 }
 
+/* Producto libre: el nombre, precio y cantidad los escribe el usuario. Sin descuento de mayoreo ni cálculo de costos. */
+function addFreeCotItem(){
+  const statusEl = document.getElementById('cot-status');
+  const name = (document.getElementById('cot-free-name').value || '').trim();
+  const price = parseFloat(document.getElementById('cot-free-price').value);
+  const qty = parseInt(document.getElementById('cot-free-qty').value) || 0;
+  if(!name){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Escribe la descripción del producto.</span>'; return; }
+  if(!(price>=0) || isNaN(price)){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Pon el precio por pieza.</span>'; return; }
+  if(qty<=0){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Pon una cantidad válida.</span>'; return; }
+  cotItems.push({
+    name, qty,
+    priceUnit: price, priceBulk: price,
+    savingsPct: 0, savingsUnit: 0, savingsTotal: 0,
+    totalBulk: price*qty,
+    calcInputs: null,
+    manual: true
+  });
+  document.getElementById('cot-free-name').value = '';
+  document.getElementById('cot-free-price').value = '';
+  document.getElementById('cot-free-qty').value = '1';
+  statusEl.innerHTML = '';
+  renderCotItems();
+}
+
+/* Cambiar el precio de un producto libre directamente en la tabla. */
+function updateCotItemPrice(i, newPriceStr){
+  const it = cotItems[i];
+  if(!it || !it.manual) return;
+  const p = parseFloat(newPriceStr);
+  if(isNaN(p) || p<0){ renderCotItems(); return; }
+  it.priceUnit = p; it.priceBulk = p;
+  it.totalBulk = p*it.qty;
+  renderCotItems();
+}
+
 function removeCotItem(i){
   cotItems.splice(i,1);
   renderCotItems();
@@ -3609,9 +3655,11 @@ function renderCotItems(){
   const tbody = document.getElementById('cot-items-tbody');
   tbody.innerHTML = cotItems.length ? cotItems.map((it,i)=>`
     <tr>
-      <td>${it.name}</td>
+      <td>${escapeAttr(it.name)}</td>
       <td><input type="number" value="${it.qty}" min="1" step="1" style="width:70px;" onchange="updateCotItemQty(${i}, this.value)"></td>
-      <td>$${it.priceUnit.toFixed(2)}</td><td>$${it.priceBulk.toFixed(2)}</td>
+      ${it.manual
+        ? `<td colspan="2"><input type="number" value="${it.priceUnit}" min="0" step="0.01" style="width:90px;" onchange="updateCotItemPrice(${i}, this.value)"></td>`
+        : `<td>$${it.priceUnit.toFixed(2)}</td><td>$${it.priceBulk.toFixed(2)}</td>`}
       <td>${it.savingsPct.toFixed(1)}%</td>
       <td><button class="icon-btn" onclick="removeCotItem(${i})">×</button></td>
     </tr>`).join('') : `<tr><td colspan="6" class="empty">Aún no agregas productos.</td></tr>`;

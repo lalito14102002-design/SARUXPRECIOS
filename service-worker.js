@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sarux-calc-v3';
+const CACHE_NAME = 'sarux-calc-v4';
 const CORE_ASSETS = [
   './',
   './index.html',
