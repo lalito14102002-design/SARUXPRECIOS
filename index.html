@@ -207,22 +207,76 @@
     display:flex; align-items:center; justify-content:center;
   }
   #force-update-btn:active{ transform:scale(0.92); }
+
+  /* ===== SIMPLIFICACIÓN: pantalla de inicio y lectura fácil ===== */
+  body{font-size:16px;line-height:1.5;}
+  .wrap{padding-top:52px;}
+  .tabs{display:none !important;}
+  label{font-family:'Inter',sans-serif;font-size:14px;font-weight:600;color:#d6d6db;letter-spacing:0;margin-bottom:6px;}
+  input[type=number],input[type=text]{min-height:44px;font-size:16px;}
+  td input[type=number],td input[type=text]{min-height:40px;font-size:15px;}
+  select{min-height:44px;font-size:16px;}
+  .btn{min-height:46px;font-size:15px;}
+  .card h2{font-size:19px;}
+  .card .sub,.note-line{font-size:14px;}
+  .stat .label{font-family:'Inter',sans-serif;font-size:12px;}
+  .stat .val{font-size:26px;}
+  th{font-size:12px;} td{font-size:14px;}
+  #home{display:none;}
+  body.on-home #home{display:block;}
+  body:not(.on-home) header{display:none;}
+  body.on-home #panel-bar,body.on-home #home-pill{display:none;}
+  header h1{font-size:clamp(30px,6vw,42px);}
+  header p{font-size:17px;}
+  .hgroup{margin:28px 0 12px;}
+  .hgroup h2{font-family:'Space Grotesk',sans-serif;font-size:22px;margin:0;}
+  .hgroup p{color:var(--text-dim);margin:4px 0 0;font-size:15px;}
+  .hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;}
+  .hcard{position:relative;text-align:left;background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line);border-radius:16px;padding:16px;color:var(--text);cursor:pointer;font-family:'Inter',sans-serif;min-height:136px;display:flex;flex-direction:column;gap:4px;}
+  .hcard:hover,.hcard:active{border-color:var(--red-bright);}
+  .hcard .e{font-size:36px;line-height:1.1;}
+  .hcard b{font-size:17px;font-family:'Space Grotesk',sans-serif;}
+  .hcard .d{font-size:13px;color:var(--text-dim);}
+  .hnew{position:absolute;top:10px;right:10px;background:var(--red-bright);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;}
+  .hdot{position:absolute;top:12px;right:12px;width:11px;height:11px;border-radius:50%;background:var(--red-bright);display:none;}
+  #panel-bar{display:flex;align-items:center;gap:14px;margin:0 0 18px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;}
+  #panel-bar .back,#home-pill{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;background:var(--red-bright);color:#fff;border:0;border-radius:24px;padding:11px 18px;cursor:pointer;white-space:nowrap;}
+  #bar-title{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;}
+  #bar-help{font-size:14px;color:var(--text-dim);margin-top:2px;}
+  #home-pill{position:fixed;left:12px;bottom:12px;z-index:900;box-shadow:0 6px 18px rgba(0,0,0,.5);}
+  /* Láser */
+  .lzb{font-family:'Inter',sans-serif;font-weight:600;font-size:14px;background:none;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 14px;cursor:pointer;}
+  .lzit{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);}
+  .lzit:last-child{border-bottom:0;}
+  .lzv{font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--ok);margin:2px 0;}
+  .lzact{display:flex;gap:8px;align-items:center;}
+  #panel-laser table td:last-child{text-align:right;font-weight:600;}
+  #panel-laser details{margin-top:6px;}
+  #panel-laser summary{cursor:pointer;font-weight:600;padding:8px 0;}
 </style>
 </head>
-<body>
-<button id="edit-lock-btn" onclick="toggleEditLock()">🔒 Solo consulta</button>
+<body class="on-home">
+<button id="edit-lock-btn" onclick="toggleEditLock()">🔒 Solo mirar</button>
 <div id="cloud-status">☁️ conectando…</div>
 <button id="force-update-btn" onclick="forzarActualizacion()" title="Forzar actualización — usa esto si hiciste cambios y no se ven">🔄</button>
 <div class="wrap">
   <header>
-    <div class="eyebrow">SARUX · Herramientas de producción</div>
-    <h1>Calculadora de Producción</h1>
-    <p>Calcula piezas por metro de DTF y diseños por hoja A4 de sticker, con tus propios precios de proveedor.</p>
+    <div class="eyebrow">SARUX</div>
+    <h1>¿Qué quieres hacer hoy?</h1>
+    <p>Toca un botón grande para empezar.</p>
   </header>
 
+  <div id="home"></div>
+  <div id="panel-bar">
+    <button class="back" id="back-home" type="button">← Inicio</button>
+    <div><div id="bar-title"></div><div id="bar-help"></div></div>
+  </div>
+  <button id="home-pill" type="button">🏠 Inicio</button>
+
   <div class="tabs">
+    <button class="tab" data-tab="laser"><span class="n">00b</span> Láser</button>
     <button class="tab" data-tab="costos"><span class="n">00</span> Costos compartidos</button>
-    <button class="tab active" data-tab="dtf"><span class="n">01</span> DTF Textil / UV</button>
+    <button class="tab" data-tab="dtf"><span class="n">01</span> DTF Textil / UV</button>
     <button class="tab" data-tab="a4"><span class="n">02</span> Hojas Sticker A4</button>
     <button class="tab" data-tab="almohadas"><span class="n">03</span> Almohadas</button>
     <button class="tab" data-tab="mug"><span class="n">04</span> Tazas / Mugs</button>
@@ -240,7 +294,84 @@
   </div>
 
 
-  <!-- ===================== COSTOS COMPARTIDOS ===================== -->
+    <!-- ===================== LÁSER ===================== -->
+  <div class="panel" id="panel-laser">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2><span class="dot"></span>1. ¿Qué vas a grabar o cortar?</h2>
+          <p class="sub">Elige un material guardado o escribe tus datos. Los de “valores de partida” son solo para probar en un retazo.</p>
+          <div class="field"><label>Material guardado</label><select id="lz-pre"></select></div>
+          <p class="note-line" id="lz-preN"></p>
+          <div class="row3">
+            <div class="field"><label>Fuerza del láser (%)</label><input type="number" id="lz-pct" value="80" min="1" max="100"></div>
+            <div class="field"><label>Velocidad (mm/s)</label><input type="number" id="lz-vel" value="100"></div>
+            <div class="field"><label>Pasadas</label><input type="number" id="lz-pas" value="1" min="1"></div>
+          </div>
+          <div class="row3">
+            <div class="field"><label>Minutos por pieza</label><input type="number" id="lz-tpp" value="10" step="0.1"></div>
+            <div class="field"><label>¿Cuántas piezas?</label><input type="number" id="lz-qty" value="1" min="1"></div>
+            <div class="field"><label>Material por pieza ($)</label><input type="number" id="lz-mat" value="30" step="0.5"></div>
+          </div>
+          <div class="field"><label>Largo del recorrido en mm (opcional)</label><input type="number" id="lz-rec" placeholder="Si lo pones, calculo los minutos solo"></div>
+          <p class="note-line" id="lz-calcT"></p>
+        </div>
+        <div class="card">
+          <h2><span class="dot"></span>2. ¿Cuánto quieres ganar?</h2>
+          <div class="row2">
+            <div class="field"><label>Tu hora de trabajo ($)</label><input type="number" id="lz-hr" value="60"></div>
+            <div class="field"><label>Minutos de preparar y diseñar</label><input type="number" id="lz-prep" value="15"></div>
+            <div class="field"><label>Ganancia que quieres (%)</label><input type="number" id="lz-mar" value="60"></div>
+            <div class="field"><label>Cobro mínimo ($)</label><input type="number" id="lz-min" value="50"></div>
+            <div class="field"><label>Impuestos o comisión (%)</label><input type="number" id="lz-imp" value="0"></div>
+          </div>
+          <details>
+            <summary>3. Luz y desgaste de la máquina (se llena una sola vez)</summary>
+            <div class="row2">
+              <div class="field"><label>Precio de la luz ($ por kWh)</label><input type="number" id="lz-tar" value="2" step="0.1"></div>
+              <div class="field"><label>Watts al 100% de fuerza</label><input type="number" id="lz-wmax" value="120"></div>
+              <div class="field"><label>Watts en reposo</label><input type="number" id="lz-wmin" value="40"></div>
+              <div class="field"><label>Watts extras (extractor, laptop)</label><input type="number" id="lz-wext" value="80"></div>
+              <div class="field"><label>Guardar por desgaste ($ por hora)</label><input type="number" id="lz-des" value="15"></div>
+            </div>
+            <p class="note-line">Los watts son aproximados. Mídelos con un watímetro enchufable para afinarlos.</p>
+          </details>
+        </div>
+      </div>
+      <div>
+        <div class="results" style="margin-top:0">
+          <h2><span class="dot" style="background:var(--ok)"></span>Resultado</h2>
+          <div class="stat-grid">
+            <div class="stat"><div class="label">Cobra por el trabajo</div><div class="val accent" id="lz-precio">$0</div></div>
+            <div class="stat"><div class="label">Por pieza</div><div class="val ok" id="lz-ppz">$0</div></div>
+            <div class="stat"><div class="label">Tiempo total</div><div class="val" id="lz-ttot">0 min</div></div>
+          </div>
+          <h2 style="font-size:16px;margin-top:10px">Cuánto guardar</h2>
+          <table id="lz-tb"></table>
+          <p class="note-line" id="lz-alerta"></p>
+        </div>
+        <div class="card" style="margin-top:20px">
+          <h2><span class="dot"></span>Guardar estos parámetros</h2>
+          <p class="sub">Así luego consultas el % de fuerza y la velocidad que te funcionaron.</p>
+          <div class="field"><label>Nombre (ej. Termo inox con spray)</label><input type="text" id="lz-pn"></div>
+          <div class="field"><label>Notas (enfoque, spray, lente, resultado)</label><input type="text" id="lz-pnt"></div>
+          <button class="btn" id="lz-bp" type="button">Guardar parámetros</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2><span class="dot"></span>Mi biblioteca de parámetros</h2>
+      <div id="lz-lib"></div>
+    </div>
+    <div class="card">
+      <h2><span class="dot"></span>Trabajos terminados</h2>
+      <div class="row2"><div class="field"><label>Cliente o trabajo</label><input type="text" id="lz-jn"></div><div class="field"><label>&nbsp;</label><button class="btn" id="lz-bj" type="button">Guardar este trabajo</button></div></div>
+      <div id="lz-hist"></div>
+      <p class="note-line" id="lz-tot"></p>
+    </div>
+  </div>
+
+<!-- ===================== COSTOS COMPARTIDOS ===================== -->
   <div class="panel" id="panel-costos">
     <div class="grid">
       <div>
@@ -336,7 +467,7 @@
   </div>
 
   <!-- ===================== DTF PANEL ===================== -->
-  <div class="panel active" id="panel-dtf">
+  <div class="panel" id="panel-dtf">
     <div class="grid">
       <div>
         <div class="card">
@@ -735,7 +866,7 @@ function applyEditLockUI(){
   const unlocked = isEditUnlocked();
   document.body.classList.toggle('view-only', !unlocked);
   const btn = document.getElementById('edit-lock-btn');
-  if(btn) btn.textContent = unlocked ? '🔓 Modo edición' : '🔒 Solo consulta';
+  if(btn) btn.textContent = unlocked ? '🔓 Puedo editar' : '🔒 Solo mirar';
 }
 window.addEventListener('load', applyEditLockUI);
 
@@ -747,6 +878,9 @@ function activateTab(tabName){
   if(btn) btn.classList.add('active');
   const panel = document.getElementById('panel-'+tabName);
   if(panel) panel.classList.add('active');
+  document.body.classList.toggle('on-home', !panel);
+  try{ if(window.__onTab) window.__onTab(tabName); }catch(e){}
+  window.scrollTo(0,0);
 }
 document.querySelectorAll('.tab').forEach(t=>{
   t.addEventListener('click',()=>{ activateTab(t.dataset.tab); });
@@ -1494,6 +1628,9 @@ function exportBackup(){
     meta: localStorage.getItem(META_KEY) || '0',
     compras: JSON.parse(localStorage.getItem(COMPRAS_KEY) || '[]'),
     medidasPlayera: JSON.parse(localStorage.getItem(MEDIDAS_PLAYERA_KEY) || '[]'),
+    laserConfig: JSON.parse(localStorage.getItem('sarux_laser_config_v1') || 'null'),
+    laserLib: JSON.parse(localStorage.getItem('sarux_laser_lib_v1') || '[]'),
+    laserHist: JSON.parse(localStorage.getItem('sarux_laser_hist_v1') || '[]'),
     sharedSettings: {
       luz: document.getElementById('shared-luz') ? document.getElementById('shared-luz').value : null,
       labor: document.getElementById('shared-labor') ? document.getElementById('shared-labor').value : null,
@@ -1544,6 +1681,9 @@ function importBackupFile(event){
       if(backup.meta != null) localStorage.setItem(META_KEY, String(backup.meta));
       if(backup.compras) localStorage.setItem(COMPRAS_KEY, JSON.stringify(backup.compras));
       if(backup.medidasPlayera) localStorage.setItem(MEDIDAS_PLAYERA_KEY, JSON.stringify(backup.medidasPlayera));
+      if(backup.laserConfig) localStorage.setItem('sarux_laser_config_v1', JSON.stringify(backup.laserConfig));
+      if(backup.laserLib) localStorage.setItem('sarux_laser_lib_v1', JSON.stringify(backup.laserLib));
+      if(backup.laserHist) localStorage.setItem('sarux_laser_hist_v1', JSON.stringify(backup.laserHist));
       if(backup.sharedSettings){
         localStorage.setItem(SHARED_SETTINGS_KEY, JSON.stringify(backup.sharedSettings));
       }
@@ -4406,5 +4546,127 @@ async function forzarActualizacion(){
 }
 
 </script>
+<script>
+/* ===== Inicio sencillo + navegación ===== */
+(function(){
+  const HOME=[
+   {t:"Calcular cuánto cobrar",d:"Elige lo que vas a hacer y te digo el precio.",i:[
+    ["playera","👕","Playeras","¿Cuánto cobro por una playera?"],
+    ["ropadtf","🧥","Playera o sudadera DTF","Ropa con diseño pegado."],
+    ["mug","☕","Tazas","¿Cuánto cobro por una taza?"],
+    ["termo","🥤","Termos y vasos","¿Cuánto cobro por un termo?"],
+    ["gorra","🧢","Gorras","¿Cuánto cobro por una gorra?"],
+    ["almohadas","🛏️","Almohadas","¿Cuánto cobro por una almohada?"],
+    ["puzzle","🧩","Rompecabezas","¿Cuánto cobro por uno?"],
+    ["otros","🎁","Otros productos","Otras cosas que se sublimen."],
+    ["dtf","🖨️","Rollo de DTF","¿Cuántos diseños caben en el rollo?"],
+    ["a4","🏷️","Hojas de stickers","¿Cuántos diseños caben en una hoja?"],
+    ["laser","🔥","Láser","Grabar y cortar: cuánto cobrar y cuánto guardar.","NUEVO"]]},
+   {t:"Vender",d:"Para tus clientes.",i:[
+    ["lista","📋","Lista de precios","Todos tus precios juntos."],
+    ["cotizacion","📝","Cotización","Un presupuesto para tu cliente."],
+    ["ventas","🛒","Ventas","Anota lo que vendiste."]]},
+   {t:"Mi negocio",d:"Cuentas y cosas que se llenan una sola vez.",i:[
+    ["admin","💰","Ganancias","¿Cuánto he ganado?"],
+    ["inventario","📦","Inventario","Lo que tienes y lo que te falta.","DOT"],
+    ["costos","⚙️","Mis costos","Luz, tiempo y tinta."]]}];
+  const HELP={
+   laser:"Llena los cuadros de arriba hacia abajo. El precio sale en la caja de Resultado.",
+   costos:"Escribe aquí cuánto cuestan la luz, tu tiempo y la tinta. Se llena una vez y las calculadoras lo usan.",
+   lista:"Aquí ves todos tus precios juntos para consultarlos rápido.",
+   cotizacion:"Pon los datos del cliente, agrega productos y mira cómo queda abajo.",
+   ventas:"Cada vez que vendas algo, anótalo aquí.",
+   admin:"Aquí ves cuánto has ganado.",
+   inventario:"Aquí ves lo que tienes y lo que se está acabando."};
+  const DEF="Llena los cuadros de arriba hacia abajo. El precio que debes cobrar sale en la caja de resultado.";
+  const NAMES={};
+  const home=document.getElementById("home");
+  home.innerHTML=HOME.map(g=>'<div class="hgroup"><h2>'+g[0===0?"t":"t"]+'</h2><p>'+g.d+'</p></div><div class="hgrid">'+g.i.map(x=>{
+    NAMES[x[0]]=x[1]+" "+x[2];
+    return '<button type="button" class="hcard" data-go="'+x[0]+'"><span class="e">'+x[1]+'</span><b>'+x[2]+'</b><span class="d">'+x[3]+'</span>'+(x[4]==="NUEVO"?'<span class="hnew">NUEVO</span>':'')+(x[4]==="DOT"?'<span class="hdot" id="home-inv-dot"></span>':'')+'</button>';
+  }).join("")+'</div>').join("");
+  home.addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(b)activateTab(b.dataset.go)});
+  window.__onTab=function(name){
+    document.getElementById("bar-title").textContent=NAMES[name]||"";
+    document.getElementById("bar-help").textContent=HELP[name]||DEF;
+  };
+  function goHome(){
+    document.querySelectorAll(".tab,.panel").forEach(x=>x.classList.remove("active"));
+    document.body.classList.add("on-home");window.scrollTo(0,0);
+  }
+  document.getElementById("back-home").onclick=goHome;
+  document.getElementById("home-pill").onclick=goHome;
+  const src=document.getElementById("inv-alert-dot"),dst=document.getElementById("home-inv-dot");
+  if(src&&dst){const sync=()=>{dst.style.display=src.style.display==="none"?"none":"block"};sync();new MutationObserver(sync).observe(src,{attributes:true,attributeFilter:["style"]})}
+})();
+
+/* ===== Calculadora láser ===== */
+(function(){
+  const $=id=>document.getElementById(id);
+  if(!$("lz-pct"))return;
+  const m=n=>"$"+(+n||0).toLocaleString("es-MX",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const v=id=>parseFloat($(id).value)||0;
+  const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const KC="sarux_laser_config_v1",KL="sarux_laser_lib_v1",KH="sarux_laser_hist_v1";
+  const CFG=["hr","prep","mar","min","imp","tar","wmax","wmin","wext","des"];
+  const BUILT=[
+   {n:"Termo acero inox con spray",pct:100,vel:20,pas:1,tpp:12,mat:25,note:"Usa rotary. Prueba en un termo viejo."},
+   {n:"Vidrio",pct:70,vel:50,pas:1,tpp:10,mat:20,note:"Con spray o cinta. Prueba en un retazo."},
+   {n:"Papel picado (corte)",pct:40,vel:25,pas:1,tpp:8,mat:10,note:"Prueba si corta completo."},
+   {n:"Madera grabado",pct:60,vel:100,pas:1,tpp:10,mat:15,note:"Ajusta el contraste."},
+   {n:"MDF 3 mm corte",pct:100,vel:3,pas:3,tpp:6,mat:12,note:"Varias pasadas."}];
+  function ld(k,d){try{const r=localStorage.getItem(k);return r?JSON.parse(r):d}catch(e){return d}}
+  function sv(k,x){try{localStorage.setItem(k,JSON.stringify(x))}catch(e){}}
+  let last=null,lib=ld(KL,[]),hist=ld(KH,[]);
+  const c0=ld(KC,null);
+  if(c0){CFG.forEach(k=>{if(c0[k]!==undefined)$("lz-"+k).value=c0[k]})}
+  else if($("shared-labor")&&$("shared-labor").value)$("lz-hr").value=$("shared-labor").value;
+  function calc(){
+    const pct=Math.min(100,Math.max(0,v("lz-pct"))),qty=Math.max(1,v("lz-qty")),pas=Math.max(1,v("lz-pas"));
+    let tpp=v("lz-tpp");
+    if(v("lz-rec")>0&&v("lz-vel")>0){tpp=v("lz-rec")*pas/v("lz-vel")/60;$("lz-calcT").textContent="Calculé "+tpp.toFixed(1)+" min por pieza (recorrido x pasadas ÷ velocidad). Es solo el tiempo de grabado: si tu pieza tarda más, borra el recorrido y escribe los minutos."}
+    else $("lz-calcT").textContent="";
+    const th=tpp*qty/60;
+    const watts=v("lz-wmin")+(v("lz-wmax")-v("lz-wmin"))*pct/100+v("lz-wext");
+    const kwh=watts*th/1000,luz=kwh*v("lz-tar"),des=th*v("lz-des");
+    const mat=v("lz-mat")*qty,mo=v("lz-prep")/60*v("lz-hr");
+    const costo=luz+des+mat+mo;
+    const base=costo*(1+v("lz-mar")/100),precio=Math.max(v("lz-min"),base);
+    const imp=precio*v("lz-imp")/100,gan=precio-costo-imp;
+    last={precio,luz,des,imp,gan,th:th*60,qty,tpp};
+    $("lz-precio").textContent=m(precio);
+    $("lz-ppz").textContent=m(precio/qty);
+    $("lz-ttot").textContent=(th*60).toFixed(1)+" min";
+    const rows=[["Consumo estimado",watts.toFixed(0)+" W / "+kwh.toFixed(3)+" kWh"],["Guardar para la luz",m(luz)],["Guardar por desgaste de la máquina",m(des)],["Material",m(mat)],["Tu trabajo",m(mo)],["Guardar para impuestos o comisión",m(imp)],["Ganancia libre",'<span style="color:var(--'+(gan>=0?"ok":"red-bright")+')">'+m(gan)+"</span>"]];
+    $("lz-tb").innerHTML=rows.map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td></tr>").join("");
+    $("lz-alerta").textContent=base<v("lz-min")?"Se usó tu cobro mínimo.":"";
+  }
+  function ap(p){["pct","vel","pas","tpp","mat"].forEach(k=>$("lz-"+k).value=p[k]);$("lz-rec").value="";$("lz-preN").textContent=p.note||"";calc()}
+  function rs(){$("lz-pre").innerHTML='<option value="">Elegir...</option><optgroup label="Mis parámetros">'+lib.map((p,i)=>'<option value="u'+i+'">'+esc(p.n)+"</option>").join("")+'</optgroup><optgroup label="Valores de partida (a probar)">'+BUILT.map((p,i)=>'<option value="b'+i+'">'+esc(p.n)+"</option>").join("")+"</optgroup>"}
+  function rl(){
+    $("lz-lib").innerHTML=lib.length?lib.map((p,i)=>'<div class="lzit"><div><b>'+esc(p.n)+'</b><div class="lzv">'+p.pct+"% · "+p.vel+" mm/s · "+p.pas+" pasada(s) · "+p.tpp+" min</div>"+(p.note?'<small class="note-line">'+esc(p.note)+"</small>":"")+'</div><div class="lzact"><button type="button" class="lzb" data-a="l" data-i="'+i+'">Cargar</button><button type="button" class="icon-btn" data-a="d" data-i="'+i+'">×</button></div></div>').join(""):'<p class="empty">Todavía no guardas parámetros.</p>';
+    rs()}
+  function rh(){
+    $("lz-hist").innerHTML=hist.length?hist.map((j,i)=>'<div class="lzit"><div><b>'+esc(j.n)+'</b><div class="note-line" style="margin:2px 0">'+esc(j.d)+" · "+j.pct+"% · "+j.vel+" mm/s · "+j.pas+" pasada(s) · "+j.min+" min · "+j.qty+' pz</div></div><div class="lzact"><div style="text-align:right"><b>'+m(j.precio)+'</b><div class="note-line" style="margin:0">ganancia '+m(j.gan)+'</div></div><button type="button" class="icon-btn" data-a="h" data-i="'+i+'">×</button></div></div>').reverse().join(""):'<p class="empty">Todavía no guardas trabajos.</p>';
+    const t=k=>hist.reduce((a,j)=>a+(j[k]||0),0);
+    $("lz-tot").textContent=hist.length?"Totales: cobrado "+m(t("precio"))+" · luz "+m(t("luz"))+" · desgaste "+m(t("des"))+" · impuestos "+m(t("imp"))+" · ganancia "+m(t("gan")):""}
+  $("lz-pre").onchange=e=>{const s=e.target.value;if(s)ap((s[0]==="u"?lib:BUILT)[+s.slice(1)])};
+  $("lz-bp").onclick=()=>{const n=$("lz-pn").value.trim();if(!n){$("lz-pn").focus();return}
+    const p={n,note:$("lz-pnt").value.trim(),tpp:+(last.tpp).toFixed(1)};["pct","vel","pas","mat"].forEach(k=>p[k]=v("lz-"+k));
+    const i=lib.findIndex(x=>x.n.toLowerCase()===n.toLowerCase());if(i>=0)lib[i]=p;else lib.push(p);
+    sv(KL,lib);rl();$("lz-pn").value="";$("lz-pnt").value=""};
+  $("lz-bj").onclick=()=>{
+    hist.push({n:$("lz-jn").value.trim()||"Trabajo",d:new Date().toLocaleDateString("es-MX"),pct:v("lz-pct"),vel:v("lz-vel"),pas:v("lz-pas"),min:+last.th.toFixed(1),qty:last.qty,precio:last.precio,luz:last.luz,des:last.des,imp:last.imp,gan:last.gan});
+    sv(KH,hist);rh();$("lz-jn").value=""};
+  $("panel-laser").addEventListener("click",e=>{const b=e.target.closest("button[data-a]");if(!b)return;const i=+b.dataset.i,a=b.dataset.a;
+    if(a==="l")ap(lib[i]);
+    if(a==="d"){lib.splice(i,1);sv(KL,lib);rl()}
+    if(a==="h"){hist.splice(i,1);sv(KH,hist);rh()}});
+  $("panel-laser").addEventListener("input",e=>{if(e.target.tagName==="INPUT")calc()});
+  CFG.forEach(k=>$("lz-"+k).addEventListener("change",()=>{const c={};CFG.forEach(j=>c[j]=$("lz-"+j).value);sv(KC,c)}));
+  calc();rl();rh();
+})();
+</script>
+
 </body>
 </html>
