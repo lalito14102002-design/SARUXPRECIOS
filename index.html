@@ -3993,9 +3993,14 @@ async function downloadCurrentQuotePDF(){
     if(statusEl) statusEl.innerHTML = 'Preparando el PDF…';
     await loadJsPDF();
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ unit:'in', format:'letter' });
+    /* Se respeta la proporción real de la imagen: nunca se estira. Si cabe en una carta, es una carta;
+       si el contenido es más largo, la hoja crece hacia abajo (mismo ancho, nada se achica ni se corta). */
+    const pageW = 8.5;
+    const imgH = pageW * canvas.height / canvas.width;
+    const pageH = Math.max(11, imgH);
+    const pdf = new jsPDF({ unit:'in', format: [pageW, pageH], orientation:'portrait' });
     const imgData = canvas.toDataURL('image/png');
-    pdf.addImage(imgData, 'PNG', 0, 0, 8.5, 11);
+    pdf.addImage(imgData, 'PNG', 0, 0, pageW, imgH);
     pdf.save(filename);
     if(statusEl) statusEl.innerHTML = '<span style="color:var(--ok)">PDF descargado.</span>';
   }catch(e){
@@ -4388,41 +4393,48 @@ async function drawQuoteToCanvas(q){
     y += 5;
   });
 
-  /* ----- Pie de página ----- */
-  y += 20;
-  ctx.strokeStyle = '#ddd';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(M,y); ctx.lineTo(W-M,y); ctx.stroke();
-  y += 52;
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#0a0a0c';
-  ctx.font = "700 28px 'Inter', sans-serif";
-  ctx.fillText('¡Gracias por tu preferencia!', W/2, y);
+  /* ----- Pie de página (anclado al fondo de la hoja carta) ----- */
+  const PAGE_H = Math.round(W * 11 / 8.5);   // proporción exacta de hoja carta (1700 x 2200)
   const contacts = [];
   if(biz.ig) contacts.push('Instagram ' + bizHandle(biz.ig));
   if(biz.fb) contacts.push('Facebook ' + biz.fb);
   if(biz.tt) contacts.push('TikTok ' + bizHandle(biz.tt));
   if(biz.email) contacts.push(biz.email);
   if(biz.web) contacts.push(biz.web);
-  if(contacts.length){
-    ctx.font = "500 22px 'Inter', sans-serif";
-    ctx.fillStyle = '#555';
-    const sep = '   ·   ';
-    let line = '';
-    contacts.forEach(function(c){
-      const test = line ? line + sep + c : c;
-      if(ctx.measureText(test).width > W-2*M && line){
-        y += 38;
-        ctx.fillText(line, W/2, y);
-        line = c;
-      } else line = test;
-    });
-    if(line){ y += 38; ctx.fillText(line, W/2, y); }
-  }
+  ctx.font = "500 22px 'Inter', sans-serif";
+  const contactLines = [];
+  const sep = '   ·   ';
+  let cl = '';
+  contacts.forEach(function(c){
+    const test = cl ? cl + sep + c : c;
+    if(ctx.measureText(test).width > W-2*M && cl){ contactLines.push(cl); cl = c; }
+    else cl = test;
+  });
+  if(cl) contactLines.push(cl);
+  const footerBlockH = 52 + contactLines.length * 38 + 6;
+  const minFooterTop = y + 40;
+  const idealFooterTop = PAGE_H - M - footerBlockH;
+  const footerTop = Math.max(minFooterTop, idealFooterTop);
+
+  ctx.strokeStyle = '#ddd';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(M,footerTop); ctx.lineTo(W-M,footerTop); ctx.stroke();
+  let fy = footerTop + 52;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#0a0a0c';
+  ctx.font = "700 28px 'Inter', sans-serif";
+  ctx.fillText('¡Gracias por tu preferencia!', W/2, fy);
+  ctx.font = "500 22px 'Inter', sans-serif";
+  ctx.fillStyle = '#555';
+  contactLines.forEach(function(line){
+    fy += 38;
+    ctx.fillText(line, W/2, fy);
+  });
   ctx.textAlign = 'left';
 
-  /* Recorta el canvas visible al alto real del contenido (con un pequeño margen inferior) */
-  const finalH = Math.min(Math.max(y + M, 700), MAXH);
+  /* La hoja siempre mide como mínimo una carta completa (mismas proporciones que el PDF),
+     y solo crece hacia abajo si el contenido no cabe. */
+  const finalH = Math.min(Math.max(PAGE_H, footerTop + footerBlockH + M), MAXH);
   const canvas = document.getElementById('cot-canvas');
   canvas.width = W;
   canvas.height = finalH;
