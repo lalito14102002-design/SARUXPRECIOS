@@ -1615,6 +1615,7 @@ function exportBackup(){
     customProducts: JSON.parse(localStorage.getItem(CUSTOM_PRODUCTS_KEY) || '{}'),
     discountTiers: JSON.parse(localStorage.getItem(DISCOUNT_TIERS_KEY) || '{}'),
     quoteCounter: localStorage.getItem(QUOTE_COUNTER_KEY) || '0',
+    docCounters: ['orden_pago','nota_venta','recibo','custom'].reduce(function(o,t){ o[t] = localStorage.getItem(quoteCounterKey(t)) || '0'; return o; }, {}),
     savedQuotes: JSON.parse(localStorage.getItem(SAVED_QUOTES_KEY) || '[]'),
     logo: localStorage.getItem(LOGO_KEY) || null,
     cotPhone: localStorage.getItem(COT_PHONE_KEY) || '',
@@ -1668,6 +1669,7 @@ function importBackupFile(event){
       if(backup.customProducts) localStorage.setItem(CUSTOM_PRODUCTS_KEY, JSON.stringify(backup.customProducts));
       if(backup.discountTiers) localStorage.setItem(DISCOUNT_TIERS_KEY, JSON.stringify(backup.discountTiers));
       if(backup.quoteCounter) localStorage.setItem(QUOTE_COUNTER_KEY, String(backup.quoteCounter));
+      if(backup.docCounters) Object.keys(backup.docCounters).forEach(function(t){ localStorage.setItem(quoteCounterKey(t), String(backup.docCounters[t])); });
       if(backup.savedQuotes) localStorage.setItem(SAVED_QUOTES_KEY, JSON.stringify(backup.savedQuotes));
       if(backup.logo) localStorage.setItem(LOGO_KEY, backup.logo);
       if(backup.cotPhone != null) localStorage.setItem(COT_PHONE_KEY, backup.cotPhone);
@@ -3586,17 +3588,44 @@ function getQuoteCategories(){
 function buildCotizacionPanel(){
   return `
     <div class="card">
-      <h2><span class="dot"></span>Datos de la cotización</h2>
+      <h2><span class="dot"></span>Datos del documento</h2>
       <div class="row2">
         <div class="field"><label>Cliente</label><input type="text" id="cot-client" placeholder="Nombre del cliente"></div>
         <div class="field"><label>Concepto</label><input type="text" id="cot-concept" placeholder="Ej. Playeras para evento X"></div>
       </div>
       <div class="field"><label>Margen deseado (%)</label><input type="number" id="cot-margin" value="40" step="1"></div>
-      <div class="row3">
-        <div class="field"><label>Anticipo (%) — 0 para no mostrar</label><input type="number" id="cot-anticipo" value="50" min="0" max="100" step="5"></div>
-        <div class="field"><label>Vigencia (días)</label><input type="number" id="cot-vigencia" value="15" min="0" step="1"></div>
-        <div class="field"><label>Datos de pago</label><div class="check" style="margin-top:8px;"><input type="checkbox" id="cot-show-payment" checked><label style="margin:0;font-family:'Inter',sans-serif;color:var(--text);font-size:13px;">Incluir en la cotización</label></div></div>
+      <div class="field"><label>Título del documento</label>
+        <select id="cot-doctype" onchange="onDocTypeChange()">
+          <option value="cotizacion">Cotización</option>
+          <option value="orden_pago">Orden de pago</option>
+          <option value="nota_venta">Nota de venta</option>
+          <option value="recibo">Recibo de pago</option>
+          <option value="custom">Personalizado (yo escribo el título)</option>
+        </select>
       </div>
+      <div class="field" id="cot-custom-title-wrap" style="display:none;"><label>Título personalizado</label><input type="text" id="cot-title-custom" maxlength="40" placeholder="Ej. Pedido confirmado"></div>
+      <p class="note-line" id="cot-doctype-help"></p>
+
+      <div class="row2 dt" data-doc="cotizacion custom">
+        <div class="field"><label>Anticipo (%) — 0 para no mostrar</label><input type="number" id="cot-anticipo" value="50" min="0" max="100" step="5" oninput="onTermsDependencyChange()"></div>
+        <div class="field"><label>Vigencia (días) — 0 para no mostrar</label><input type="number" id="cot-vigencia" value="15" min="0" step="1"></div>
+      </div>
+      <div class="row2 dt" data-doc="orden_pago" style="display:none;">
+        <div class="field"><label>Pagar ahora (%) — 100 = todo</label><input type="number" id="cot-paynow" value="100" min="1" max="100" step="5"></div>
+        <div class="field"><label>Plazo para pagar (días) — 0 para no mostrar</label><input type="number" id="cot-paydays" value="3" min="0" step="1"></div>
+      </div>
+      <div class="row2 dt" data-doc="nota_venta recibo" style="display:none;">
+        <div class="field"><label>Método de pago</label><select id="cot-paymethod"><option>Efectivo</option><option>Transferencia</option><option>Depósito</option><option>Tarjeta</option><option>Otro</option></select></div>
+        <div class="field"><label>Monto pagado ($) — vacío = el total</label><input type="number" id="cot-paid" inputmode="decimal" min="0" step="0.01" placeholder="Total"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Fecha de entrega (opcional)</label><input type="date" id="cot-delivery"></div>
+        <div class="field"><label>Incluir en el documento</label>
+          <div class="check dt" data-doc="cotizacion custom nota_venta recibo" style="margin-top:8px;margin-bottom:6px;"><input type="checkbox" id="cot-show-payment" checked><label id="cot-show-payment-label" style="margin:0;font-family:'Inter',sans-serif;color:var(--text);font-size:13px;">Datos de pago</label></div>
+          <div class="check" style="margin-bottom:0;"><input type="checkbox" id="cot-show-sign" checked><label style="margin:0;font-family:'Inter',sans-serif;color:var(--text);font-size:13px;">Línea de firma</label></div>
+        </div>
+      </div>
+      <div class="field"><label>Notas u observaciones (opcional)</label><input type="text" id="cot-notes" maxlength="240" placeholder="Ej. Diseño aprobado por WhatsApp"></div>
     </div>
 
     <div class="card">
@@ -3653,7 +3682,7 @@ Tiempo de entrega a confirmar según cantidad y disponibilidad.</textarea>
         <canvas id="cot-canvas" width="1700" height="2200" style="max-width:100%;height:auto;display:block;"></canvas>
       </div>
       <div class="actions" style="margin-top:14px;" id="cot-confirm-actions">
-        <button class="btn" onclick="confirmQuote()">✔ Confirmar cotización (asigna folio)</button>
+        <button class="btn" onclick="confirmQuote()">✔ Confirmar (asigna folio)</button>
       </div>
       <div class="actions" style="margin-top:14px;display:none;" id="cot-download-actions">
         <button class="btn" onclick="downloadCurrentQuote()">⬇ Descargar imagen</button>
@@ -3889,11 +3918,126 @@ function renderCotItems(){
   ` : '';
 }
 
-function nextQuoteNumber(){
-  let n = parseInt(localStorage.getItem(QUOTE_COUNTER_KEY) || '0', 10) + 1;
-  try{ localStorage.setItem(QUOTE_COUNTER_KEY, String(n)); }catch(e){}
+/* ---------- Tipos de documento ---------- */
+const DOC_TYPES = {
+  cotizacion: {label:'Cotización',      title:'COTIZACIÓN',     prefix:'COT', file:'cotizacion',     help:'Propuesta de precios para que el cliente la apruebe. Muestra vigencia y anticipo.'},
+  orden_pago: {label:'Orden de pago',   title:'ORDEN DE PAGO',  prefix:'OP',  file:'orden-de-pago',  help:'Para cobrar: muestra cuánto pagar, tus datos de pago y el folio como referencia.'},
+  nota_venta: {label:'Nota de venta',   title:'NOTA DE VENTA',  prefix:'NV',  file:'nota-de-venta',  help:'Comprobante de venta: método de pago, lo pagado y el saldo, con sello de PAGADO.'},
+  recibo:     {label:'Recibo de pago',  title:'RECIBO DE PAGO', prefix:'RP',  file:'recibo-de-pago', help:'Comprobante de un pago recibido, con la cantidad en letra.'},
+  custom:     {label:'Documento',       title:'DOCUMENTO',      prefix:'DOC', file:'documento',      help:'Tú escribes el título; usa los mismos campos que la cotización.'}
+};
+function docTypeOf(q){ return (q && DOC_TYPES[q.docType]) ? q.docType : 'cotizacion'; }
+function docTitleOf(q){
+  const t = docTypeOf(q);
+  if(t === 'custom'){ const c = ((q && q.titleCustom) || '').trim(); return (c || 'DOCUMENTO').toUpperCase(); }
+  return DOC_TYPES[t].title;
+}
+function docNounOf(q){
+  const t = docTypeOf(q);
+  if(t === 'custom'){ const c = ((q && q.titleCustom) || '').trim(); return c || 'Documento'; }
+  return DOC_TYPES[t].label;
+}
+function quoteFolio(q){ return DOC_TYPES[docTypeOf(q)].prefix + '-' + String(q.number).padStart(4,'0'); }
+function quoteFileBase(q){ return DOC_TYPES[docTypeOf(q)].file + '-' + String(q.number).padStart(4,'0') + '-' + String(q.client || '').replace(/\s+/g,'_'); }
+function quoteCounterKey(type){ return (!type || type === 'cotizacion') ? QUOTE_COUNTER_KEY : ('sarux_doc_counter_' + type); }
+function nextQuoteNumber(type){
+  const key = quoteCounterKey(type);
+  let n = parseInt(localStorage.getItem(key) || '0', 10) + 1;
+  try{ localStorage.setItem(key, String(n)); }catch(e){}
   return n;
 }
+
+function defaultTermsFor(type, anticipo){
+  if(type === 'orden_pago') return [
+    'La producción inicia una vez confirmado el pago.',
+    'Envía tu comprobante de pago por WhatsApp indicando el folio.',
+    'Tiempo de entrega a confirmar según cantidad y disponibilidad.'
+  ].join('\n');
+  if(type === 'nota_venta') return [
+    'Conserva esta nota como comprobante de tu compra.',
+    'Para cualquier aclaración, comunícate indicando tu folio.'
+  ].join('\n');
+  if(type === 'recibo') return [
+    'Este recibo ampara únicamente el pago indicado.',
+    'Conserva este recibo como comprobante.'
+  ].join('\n');
+  const l = ['Precios sujetos a cambio sin previo aviso.'];
+  if(anticipo > 0) l.push('Se requiere el anticipo indicado para iniciar producción.');
+  l.push('Tiempo de entrega a confirmar según cantidad y disponibilidad.');
+  return l.join('\n');
+}
+
+let cotTermsEdited = false;
+function refreshDefaultTerms(){
+  if(cotTermsEdited) return;
+  const type = document.getElementById('cot-doctype').value;
+  const antic = parseFloat((document.getElementById('cot-anticipo') || {}).value) || 0;
+  document.getElementById('cot-terms').value = defaultTermsFor(type, antic);
+}
+function onTermsDependencyChange(){ refreshDefaultTerms(); }
+
+function applyDocTypeUI(type){
+  document.querySelectorAll('#panel-cotizacion .dt').forEach(function(el){
+    const list = (el.getAttribute('data-doc') || '').split(' ');
+    el.style.display = list.indexOf(type) >= 0 ? '' : 'none';
+  });
+  const wrap = document.getElementById('cot-custom-title-wrap');
+  if(wrap) wrap.style.display = (type === 'custom') ? '' : 'none';
+  const help = document.getElementById('cot-doctype-help');
+  if(help) help.textContent = DOC_TYPES[type].help;
+  const lbl = document.getElementById('cot-show-payment-label');
+  if(lbl) lbl.textContent = (type === 'nota_venta' || type === 'recibo') ? 'Datos de pago (si queda saldo)' : 'Datos de pago';
+}
+function onDocTypeChange(){
+  const type = document.getElementById('cot-doctype').value;
+  applyDocTypeUI(type);
+  /* Valores sugeridos al cambiar de tipo (puedes cambiarlos después) */
+  const sign = document.getElementById('cot-show-sign');
+  const pay = document.getElementById('cot-show-payment');
+  if(sign) sign.checked = (type === 'cotizacion' || type === 'orden_pago' || type === 'custom');
+  if(pay && (type === 'nota_venta' || type === 'recibo')) pay.checked = true;
+  refreshDefaultTerms();
+}
+
+/* ---------- Cantidad en letra (para el recibo) ---------- */
+function numeroALetras(n){
+  n = Math.round((Number(n) || 0) * 100) / 100;
+  const ent = Math.floor(n);
+  const cent = Math.round((n - ent) * 100);
+  const U = ['','UNO','DOS','TRES','CUATRO','CINCO','SEIS','SIETE','OCHO','NUEVE','DIEZ','ONCE','DOCE','TRECE','CATORCE','QUINCE','DIECISÉIS','DIECISIETE','DIECIOCHO','DIECINUEVE','VEINTE','VEINTIUNO','VEINTIDÓS','VEINTITRÉS','VEINTICUATRO','VEINTICINCO','VEINTISÉIS','VEINTISIETE','VEINTIOCHO','VEINTINUEVE'];
+  const D = ['','','','TREINTA','CUARENTA','CINCUENTA','SESENTA','SETENTA','OCHENTA','NOVENTA'];
+  const C = ['','CIENTO','DOSCIENTOS','TRESCIENTOS','CUATROCIENTOS','QUINIENTOS','SEISCIENTOS','SETECIENTOS','OCHOCIENTOS','NOVECIENTOS'];
+  function apocope(t){ return t.replace(/VEINTIUNO$/,'VEINTIÚN').replace(/UNO$/,'UN'); }
+  function menor1000(x){
+    if(x === 100) return 'CIEN';
+    let t = '';
+    const c = Math.floor(x/100), r = x % 100;
+    if(c) t += C[c];
+    if(r){
+      if(t) t += ' ';
+      if(r < 30) t += U[r];
+      else { const d = Math.floor(r/10), u = r % 10; t += D[d] + (u ? ' Y ' + U[u] : ''); }
+    }
+    return t;
+  }
+  function entero(x){
+    if(x === 0) return 'CERO';
+    const mill = Math.floor(x/1000000), rest = x % 1000000, mil = Math.floor(rest/1000), uni = rest % 1000;
+    let t = '';
+    if(mill) t += (mill === 1) ? 'UN MILLÓN' : apocope(menor1000(mill)) + ' MILLONES';
+    if(mil){ if(t) t += ' '; t += (mil === 1) ? 'MIL' : apocope(menor1000(mil)) + ' MIL'; }
+    if(uni){ if(t) t += ' '; t += menor1000(uni); }
+    return t;
+  }
+  let palabras = entero(ent);
+  let sufijo = ' PESOS';
+  if(ent === 1){ sufijo = ' PESO'; }
+  else if(ent > 0 && ent % 1000000 === 0){ sufijo = ' DE PESOS'; }
+  if(ent !== 1) palabras = (ent > 0 ? apocope(palabras) : palabras);
+  else palabras = 'UN';
+  return palabras + sufijo + ' ' + String(cent).padStart(2,'0') + '/100 M.N.';
+}
+
 function loadSavedQuotes(){
   try{ return JSON.parse(localStorage.getItem(SAVED_QUOTES_KEY) || '[]'); }catch(e){ return []; }
 }
@@ -3910,22 +4054,39 @@ async function previewQuoteImage(){
   const concept = (document.getElementById('cot-concept').value||'').trim();
   const terms = document.getElementById('cot-terms').value || '';
   const statusEl = document.getElementById('cot-status');
+  const docType = document.getElementById('cot-doctype').value;
+  const titleCustom = (document.getElementById('cot-title-custom').value || '').trim();
 
   if(!client){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Escribe el nombre del cliente antes de generar.</span>'; return; }
-  if(cotItems.length===0){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Agrega al menos un producto a la cotización.</span>'; return; }
+  if(docType === 'custom' && !titleCustom){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Escribe el título personalizado del documento.</span>'; return; }
+  if(cotItems.length===0){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Agrega al menos un producto.</span>'; return; }
 
   const now = new Date();
   const totalBulk = cotItems.reduce((s,it)=>s+it.totalBulk,0);
   const totalSavings = cotItems.reduce((s,it)=>s+it.savingsTotal,0);
-  const anticipoPct = Math.min(100, Math.max(0, parseFloat(document.getElementById('cot-anticipo').value) || 0));
-  const vigenciaDays = Math.max(0, parseInt(document.getElementById('cot-vigencia').value) || 0);
-  const showPayment = document.getElementById('cot-show-payment').checked;
+  const num = function(id){ const el = document.getElementById(id); return el ? parseFloat(el.value) : NaN; };
+
+  const usesAnticipo = (docType === 'cotizacion' || docType === 'custom');
+  const anticipoPct = usesAnticipo ? Math.min(100, Math.max(0, num('cot-anticipo') || 0)) : 0;
+  const vigenciaDays = usesAnticipo ? Math.max(0, Math.round(num('cot-vigencia') || 0)) : 0;
+  const payNowPct = docType === 'orden_pago' ? Math.min(100, Math.max(1, num('cot-paynow') || 100)) : 100;
+  const payDays = docType === 'orden_pago' ? Math.max(0, Math.round(num('cot-paydays') || 0)) : 0;
+  const isPaidDoc = (docType === 'nota_venta' || docType === 'recibo');
+  const payMethod = isPaidDoc ? document.getElementById('cot-paymethod').value : '';
+  const paidRaw = isPaidDoc ? document.getElementById('cot-paid').value : '';
+  const paidAmount = (isPaidDoc && paidRaw !== '' && !isNaN(parseFloat(paidRaw))) ? Math.max(0, parseFloat(paidRaw)) : null;
+  const deliveryDate = document.getElementById('cot-delivery').value || '';
+  const notes = (document.getElementById('cot-notes').value || '').trim();
+  const showPayment = docType === 'orden_pago' ? true : document.getElementById('cot-show-payment').checked;
+  const showSignature = document.getElementById('cot-show-sign').checked;
 
   const quoteData = {
     number: null, dateISO: now.toISOString(), client, concept,
     items: cotItems.map(it=>({...it})),
     totalBulk, totalSavings, terms, confirmed: false,
-    anticipoPct, vigenciaDays, showPayment
+    docType, titleCustom,
+    anticipoPct, vigenciaDays, payNowPct, payDays, payMethod, paidAmount,
+    deliveryDate, notes, showPayment, showSignature
   };
   currentQuoteData = quoteData;
 
@@ -3935,7 +4096,14 @@ async function previewQuoteImage(){
   document.getElementById('cot-preview-card').style.display = 'block';
   document.getElementById('cot-confirm-actions').style.display = 'block';
   document.getElementById('cot-download-actions').style.display = 'none';
-  statusEl.innerHTML = '<span style="color:var(--ok)">Vista previa lista (sin folio) — revísala y pulsa "Confirmar" para asignarle folio y guardarla.</span>';
+  let msg = '<span style="color:var(--ok)">Vista previa lista (sin folio) — revísala y pulsa "Confirmar" para asignarle folio y guardarla.</span>';
+  if(docType === 'orden_pago'){
+    const b = getBizInfo();
+    if(!(b.bank || b.holder || b.clabe || b.account)){
+      msg += '<br><span style="color:var(--red-bright)">Ojo: una orden de pago necesita tus datos de pago. Captúralos en Ajustes (pestaña 00) y vuelve a generar.</span>';
+    }
+  }
+  statusEl.innerHTML = msg;
   document.getElementById('cot-preview-card').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
@@ -3945,11 +4113,11 @@ async function confirmQuote(){
   const statusEl = document.getElementById('cot-status');
   if(!currentQuoteData){ statusEl.innerHTML = '<span style="color:var(--red-bright)">Primero genera una vista previa.</span>'; return; }
   if(currentQuoteData.confirmed){
-    statusEl.innerHTML = `<span style="color:var(--ok)">Ya estaba confirmada como COT-${String(currentQuoteData.number).padStart(4,'0')}.</span>`;
+    statusEl.innerHTML = `<span style="color:var(--ok)">Ya estaba confirmado como ${quoteFolio(currentQuoteData)}.</span>`;
     return;
   }
 
-  const number = nextQuoteNumber();
+  const number = nextQuoteNumber(docTypeOf(currentQuoteData));
   currentQuoteData.number = number;
   currentQuoteData.dateISO = new Date().toISOString();
   currentQuoteData.confirmed = true;
@@ -3961,12 +4129,12 @@ async function confirmQuote(){
 
   await drawQuoteToCanvas(currentQuoteData);
   document.getElementById('cot-download-actions').style.display = 'block';
-  statusEl.innerHTML = `<span style="color:var(--ok)">Cotización COT-${String(number).padStart(4,'0')} confirmada y guardada.</span>`;
+  statusEl.innerHTML = `<span style="color:var(--ok)">${docNounOf(currentQuoteData)} ${quoteFolio(currentQuoteData)} confirmado y guardado.</span>`;
 }
 
 function downloadCurrentQuote(){
   if(!currentQuoteData || !currentQuoteData.confirmed) return;
-  downloadCanvasAsImage(`cotizacion-${String(currentQuoteData.number).padStart(4,'0')}-${currentQuoteData.client.replace(/\s+/g,'_')}.png`);
+  downloadCanvasAsImage(`${quoteFileBase(currentQuoteData)}.png`);
 }
 
 /* jsPDF se carga solo hasta que se necesita (al pedir el PDF), no al abrir la página,
@@ -3987,7 +4155,7 @@ function loadJsPDF(){
 async function downloadCurrentQuotePDF(){
   if(!currentQuoteData || !currentQuoteData.confirmed) return;
   const canvas = document.getElementById('cot-canvas');
-  const filename = `cotizacion-${String(currentQuoteData.number).padStart(4,'0')}-${currentQuoteData.client.replace(/\s+/g,'_')}.pdf`;
+  const filename = `${quoteFileBase(currentQuoteData)}.pdf`;
   const statusEl = document.getElementById('cot-status');
   try{
     if(statusEl) statusEl.innerHTML = 'Preparando el PDF…';
@@ -4012,7 +4180,7 @@ async function downloadCurrentQuotePDF(){
 async function shareCurrentQuoteWhatsapp(){
   if(!currentQuoteData || !currentQuoteData.confirmed) return;
   const canvas = document.getElementById('cot-canvas');
-  const filename = `cotizacion-${String(currentQuoteData.number).padStart(4,'0')}-${currentQuoteData.client.replace(/\s+/g,'_')}.png`;
+  const filename = `${quoteFileBase(currentQuoteData)}.png`;
 
   canvas.toBlob(async (blob)=>{
     const file = new File([blob], filename, {type:'image/png'});
@@ -4020,15 +4188,15 @@ async function shareCurrentQuoteWhatsapp(){
       try{
         await navigator.share({
           files:[file],
-          title: 'Cotización SARUX',
-          text: `Cotización COT-${String(currentQuoteData.number).padStart(4,'0')} para ${currentQuoteData.client}`
+          title: `${docNounOf(currentQuoteData)} SARUX`,
+          text: `${docNounOf(currentQuoteData)} ${quoteFolio(currentQuoteData)} para ${currentQuoteData.client}`
         });
         return;
       }catch(e){ /* el usuario canceló o no se pudo, cae al respaldo de abajo */ }
     }
     // Respaldo: no se puede adjuntar imagen directo — se descarga y se abre WhatsApp con el texto
     downloadCanvasAsImage(filename);
-    const text = encodeURIComponent(`Cotización COT-${String(currentQuoteData.number).padStart(4,'0')} para ${currentQuoteData.client} — te comparto la imagen que se acaba de descargar.`);
+    const text = encodeURIComponent(`${docNounOf(currentQuoteData)} ${quoteFolio(currentQuoteData)} para ${currentQuoteData.client} — te comparto la imagen que se acaba de descargar.`);
     window.open(`https://wa.me/?text=${text}`, '_blank');
   }, 'image/png');
 }
@@ -4121,20 +4289,70 @@ function formatClabe(v){
   return d.length === 18 ? d.replace(/(\d{4})(?=\d)/g, '$1 ') : (v || '');
 }
 
+/* Recuadro gris con barra roja y varias celdas (etiqueta + valor) en una fila */
+function drawInfoBox(ctx, M, W, y, cells){
+  const boxH = 104;
+  ctx.fillStyle = '#f7f5f2';
+  ctx.fillRect(M, y, W-2*M, boxH);
+  ctx.fillStyle = '#c81e3a';
+  ctx.fillRect(M, y, 8, boxH);
+  const colW = (W-2*M) / cells.length;
+  ctx.textAlign = 'left';
+  cells.forEach(function(c,i){
+    const cx = M + 34 + i*colW;
+    ctx.fillStyle = '#777';
+    ctx.font = "500 22px 'Inter', sans-serif";
+    ctx.fillText(fitCanvasLine(ctx, c.label, colW-50), cx, y+36);
+    ctx.fillStyle = c.color || '#0a0a0c';
+    ctx.font = c.small ? "700 30px 'Inter', sans-serif" : "700 36px 'Space Grotesk', sans-serif";
+    ctx.fillText(fitCanvasLine(ctx, c.value, colW-50), cx, y+82);
+  });
+  return boxH;
+}
+
+/* Sello rotado (PAGADO / ANTICIPO RECIBIDO) */
+function drawStamp(ctx, cx, cy, text, color){
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.1);
+  ctx.globalAlpha = 0.92;
+  ctx.font = "700 60px 'Space Grotesk', sans-serif";
+  const tw = ctx.measureText(text).width;
+  const w = tw + 80, h = 108;
+  ctx.strokeStyle = color; ctx.fillStyle = color;
+  ctx.lineWidth = 8;
+  ctx.strokeRect(-w/2, -h/2, w, h);
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-w/2+14, -h/2+14, w-28, h-28);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 0, 3);
+  ctx.restore();
+}
+
 async function drawQuoteToCanvas(q){
   /* Se dibuja primero sobre un lienzo temporal generosamente alto, y al final
-     se recorta el canvas visible exactamente a donde terminó el contenido —
-     así nunca queda un bloque de espacio en blanco después del pie de página. */
+     se recorta el canvas visible: siempre mide como mínimo una hoja carta completa
+     (mismas proporciones que el PDF) y solo crece hacia abajo si el contenido no cabe. */
   const W = 1700;
   const M = 70;
-  const MAXH = 3200;
+  const MAXH = 3400;
+  const PAGE_H = Math.round(W * 11 / 8.5);   // 1700 x 2200 = carta
   const off = document.createElement('canvas');
   off.width = W; off.height = MAXH;
   const ctx = off.getContext('2d');
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0,0,W,MAXH);
 
+  const type = docTypeOf(q);
   const biz = getBizInfo();
+  const total = q.totalBulk;
+  const isPaidDoc = (type === 'nota_venta' || type === 'recibo');
+  const paid = isPaidDoc ? Math.min(total, (q.paidAmount != null && isFinite(q.paidAmount)) ? Math.max(0, q.paidAmount) : total) : 0;
+  const saldo = Math.max(0, total - paid);
+  const GREEN = '#1f8a4c', RED = '#c81e3a';
+  const dateOpts = {year:'numeric', month:'long', day:'numeric'};
+
   let y = M;
 
   const logoDataUrl = localStorage.getItem(LOGO_KEY);
@@ -4161,20 +4379,23 @@ async function drawQuoteToCanvas(q){
   }
 
   ctx.textAlign = 'right';
-  ctx.fillStyle = '#c81e3a';
+  ctx.fillStyle = RED;
   ctx.font = "700 30px 'JetBrains Mono', monospace";
-  ctx.fillText('COTIZACIÓN', W-M, y+16);
+  ctx.fillText(fitCanvasLine(ctx, docTitleOf(q), 800), W-M, y+16);
   ctx.font = "600 24px 'JetBrains Mono', monospace";
   ctx.fillStyle = '#444';
-  ctx.fillText(q.number ? ('COT-'+String(q.number).padStart(4,'0')) : 'BORRADOR — sin folio', W-M, y+48);
+  ctx.fillText(q.number ? quoteFolio(q) : 'BORRADOR — sin folio', W-M, y+48);
   const d = new Date(q.dateISO);
-  const dateOpts = {year:'numeric', month:'long', day:'numeric'};
   ctx.font = "500 22px 'JetBrains Mono', monospace";
   let ry = y + 78;
   ctx.fillText(d.toLocaleDateString('es-MX', dateOpts), W-M, ry);
-  if(q.vigenciaDays > 0){
-    const until = new Date(d.getTime());
-    until.setDate(until.getDate() + q.vigenciaDays);
+  if(type === 'orden_pago' && q.payDays > 0){
+    const until = new Date(d.getTime()); until.setDate(until.getDate() + q.payDays);
+    ry += 30;
+    ctx.fillStyle = RED;
+    ctx.fillText('Pagar antes del ' + until.toLocaleDateString('es-MX', dateOpts), W-M, ry);
+  } else if((type === 'cotizacion' || type === 'custom') && q.vigenciaDays > 0){
+    const until = new Date(d.getTime()); until.setDate(until.getDate() + q.vigenciaDays);
     ry += 30;
     ctx.fillStyle = '#444';
     ctx.fillText('Válida hasta el ' + until.toLocaleDateString('es-MX', dateOpts), W-M, ry);
@@ -4191,7 +4412,7 @@ async function drawQuoteToCanvas(q){
   ctx.textAlign = 'left';
 
   y += Math.max(logoBlockH, headerRightH) + 26;
-  ctx.strokeStyle = '#c81e3a';
+  ctx.strokeStyle = RED;
   ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(M,y); ctx.lineTo(W-M,y); ctx.stroke();
 
@@ -4202,7 +4423,7 @@ async function drawQuoteToCanvas(q){
   if(q.concept){
     ctx.font = "400 26px 'Inter', sans-serif";
     ctx.fillStyle = '#333';
-    y = wrapCanvasText(ctx, 'Concepto: '+q.concept, M, y+40, W-2*M, 34);
+    y = wrapCanvasText(ctx, 'Concepto: '+prettyQuoteName(q.concept), M, y+40, W-2*M, 34);
   } else {
     y += 10;
   }
@@ -4262,7 +4483,7 @@ async function drawQuoteToCanvas(q){
         const tw = ctx.measureText(t).width;
         ctx.strokeStyle = '#888'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(colX[2], cy-8); ctx.lineTo(colX[2]+tw, cy-8); ctx.stroke();
-        ctx.fillStyle = '#c81e3a';
+        ctx.fillStyle = RED;
       } else {
         ctx.fillText('—', colX[2], cy);
         ctx.fillStyle = '#0a0a0c';
@@ -4287,7 +4508,7 @@ async function drawQuoteToCanvas(q){
   y += 50;
 
   /* ----- Totales ----- */
-  const total = q.totalBulk;
+  const totalsTop = y - 30;
   const savingsTotal = q.items.reduce(function(s,it){ return s + (it.savingsTotal || 0); }, 0);
   const labelX = W-M-320;
   ctx.textAlign = 'right';
@@ -4298,7 +4519,7 @@ async function drawQuoteToCanvas(q){
     ctx.fillText(quoteMoney(total + savingsTotal), W-M, y);
     y += 44;
     ctx.font = "600 26px 'Inter', sans-serif";
-    ctx.fillStyle = '#1f8a4c';
+    ctx.fillStyle = GREEN;
     ctx.fillText('Ahorras en total:', labelX, y);
     ctx.font = "700 30px 'Space Grotesk', sans-serif";
     ctx.fillText('-' + quoteMoney(savingsTotal), W-M, y);
@@ -4312,89 +4533,180 @@ async function drawQuoteToCanvas(q){
   ctx.textAlign = 'left';
   y += 34;
 
-  /* ----- Anticipo y saldo ----- */
-  if(q.anticipoPct > 0 && total > 0){
-    const pct = Math.min(100, q.anticipoPct);
-    const anticipo = total * pct / 100;
-    const saldo = total - anticipo;
-    const boxH = 104;
-    y += 14;
-    ctx.fillStyle = '#f7f5f2';
-    ctx.fillRect(M, y, W-2*M, boxH);
-    ctx.fillStyle = '#c81e3a';
-    ctx.fillRect(M, y, 8, boxH);
-    const half = (W-2*M)/2;
-    ctx.fillStyle = '#777';
-    ctx.font = "500 22px 'Inter', sans-serif";
-    ctx.fillText('Anticipo (' + String(+pct.toFixed(1)) + '%) para iniciar producción', M+34, y+36);
-    ctx.fillText('Saldo restante', M+half+34, y+36);
-    ctx.fillStyle = '#0a0a0c';
-    ctx.font = "700 36px 'Space Grotesk', sans-serif";
-    ctx.fillText(quoteMoney(anticipo), M+34, y+82);
-    ctx.fillText(quoteMoney(saldo), M+half+34, y+82);
-    y += boxH + 6;
+  /* Sello en notas de venta y recibos */
+  if(isPaidDoc){
+    const stampText = saldo <= 0.005 ? 'PAGADO' : 'ANTICIPO RECIBIDO';
+    const stampColor = saldo <= 0.005 ? GREEN : '#d97706';
+    const stampCy = totalsTop + 92;
+    drawStamp(ctx, M + 400, stampCy, stampText, stampColor);
+    y = Math.max(y, stampCy + 90);
+    ctx.textAlign = 'left';
   }
 
-  /* ----- Datos de pago ----- */
-  if(q.showPayment === true){
-    const cells = [
-      ['Banco', biz.bank],
-      ['Titular', biz.holder],
-      ['CLABE', formatClabe(biz.clabe)],
-      ['Cuenta / Tarjeta', biz.account]
-    ].filter(function(c){ return c[1]; });
-    if(cells.length){
-      const rows = Math.ceil(cells.length / 2);
-      const boxH = 28 + 42 + rows*76 + 6;
-      y += 30;
-      ctx.fillStyle = '#f7f5f2';
-      ctx.fillRect(M, y, W-2*M, boxH);
-      ctx.fillStyle = '#c81e3a';
-      ctx.fillRect(M, y, 8, boxH);
+  /* ----- Bloque de pago según el tipo de documento ----- */
+  if(type === 'cotizacion' || type === 'custom'){
+    if(q.anticipoPct > 0 && total > 0){
+      const pct = Math.min(100, q.anticipoPct);
+      const anticipo = total * pct / 100;
+      y += 14;
+      y += drawInfoBox(ctx, M, W, y, [
+        {label:'Anticipo (' + String(+pct.toFixed(1)) + '%) para iniciar producción', value:quoteMoney(anticipo)},
+        {label:'Saldo restante', value:quoteMoney(total - anticipo)}
+      ]) + 6;
+    }
+  } else if(type === 'orden_pago'){
+    const pct = Math.min(100, Math.max(1, q.payNowPct || 100));
+    const ahora = total * pct / 100;
+    const refTxt = q.number ? quoteFolio(q) : 'Se asigna al confirmar';
+    y += 14;
+    if(pct < 100){
+      y += drawInfoBox(ctx, M, W, y, [
+        {label:'Pagar ahora (' + String(+pct.toFixed(1)) + '%)', value:quoteMoney(ahora), color:RED},
+        {label:'Saldo restante', value:quoteMoney(total - ahora)},
+        {label:'Referencia de pago', value:refTxt, small:true}
+      ]) + 6;
+    } else {
+      y += drawInfoBox(ctx, M, W, y, [
+        {label:'Total a pagar', value:quoteMoney(total), color:RED},
+        {label:'Referencia de pago (pónla en tu transferencia)', value:refTxt, small:true}
+      ]) + 6;
+    }
+  } else if(type === 'nota_venta'){
+    y += 14;
+    y += drawInfoBox(ctx, M, W, y, [
+      {label:'Método de pago', value:q.payMethod || '—', small:true},
+      {label:'Pagado', value:quoteMoney(paid), color:GREEN},
+      {label:'Saldo pendiente', value:quoteMoney(saldo), color: saldo > 0.005 ? RED : GREEN}
+    ]) + 6;
+  } else if(type === 'recibo'){
+    const conceptTxt = (q.concept || '').trim() ? prettyQuoteName(q.concept) : 'pago de pedido';
+    const stmt = 'Recibimos de ' + q.client + ' la cantidad de ' + quoteMoney(paid) + ' (' + numeroALetras(paid) + ') por concepto de ' + conceptTxt + '.';
+    ctx.font = "500 26px 'Inter', sans-serif";
+    const sl = wrapLinesCanvas(ctx, stmt, W-2*M-68, 5);
+    const bh = sl.length * 38 + 40;
+    y += 14;
+    ctx.fillStyle = '#f7f5f2';
+    ctx.fillRect(M, y, W-2*M, bh);
+    ctx.fillStyle = RED;
+    ctx.fillRect(M, y, 8, bh);
+    ctx.fillStyle = '#0a0a0c';
+    ctx.font = "500 26px 'Inter', sans-serif";
+    sl.forEach(function(ln,k){ ctx.fillText(ln, M+34, y + 46 + k*38); });
+    y += bh + 16;
+    y += drawInfoBox(ctx, M, W, y, [
+      {label:'Método de pago', value:q.payMethod || '—', small:true},
+      {label:'Total del pedido', value:quoteMoney(total)},
+      {label:'Pagado', value:quoteMoney(paid), color:GREEN},
+      {label:'Saldo pendiente', value:quoteMoney(saldo), color: saldo > 0.005 ? RED : GREEN}
+    ]) + 6;
+  }
+
+  /* ----- Fecha de entrega ----- */
+  if(q.deliveryDate){
+    const dd = new Date(q.deliveryDate + 'T12:00:00');
+    if(!isNaN(dd.getTime())){
+      y += 44;
+      ctx.textAlign = 'left';
       ctx.fillStyle = '#0a0a0c';
-      ctx.font = "700 26px 'Inter', sans-serif";
-      ctx.fillText('Datos de pago', M+34, y+46);
-      const half = (W-2*M)/2;
-      cells.forEach(function(c,k){
-        const cx = M + 34 + (k % 2) * half;
-        const cyy = y + 46 + 40 + Math.floor(k/2) * 76;
-        ctx.fillStyle = '#888';
-        ctx.font = "500 20px 'JetBrains Mono', monospace";
-        ctx.fillText(c[0].toUpperCase(), cx, cyy);
-        ctx.fillStyle = '#0a0a0c';
-        ctx.font = "600 28px 'Inter', sans-serif";
-        ctx.fillText(c[1], cx, cyy + 34, half - 60);
-      });
-      y += boxH;
+      ctx.font = "700 24px 'Inter', sans-serif";
+      const lbl = (isPaidDoc ? 'Fecha de entrega: ' : 'Fecha estimada de entrega: ');
+      ctx.fillText(lbl, M, y);
+      const lw = ctx.measureText(lbl).width;
+      ctx.font = "400 24px 'Inter', sans-serif";
+      ctx.fillStyle = '#333';
+      ctx.fillText(dd.toLocaleDateString('es-MX', {weekday:'long', year:'numeric', month:'long', day:'numeric'}), M + lw, y);
     }
   }
 
-  /* ----- Términos y condiciones (en lista) ----- */
-  y += 56;
-  ctx.fillStyle = '#0a0a0c';
-  ctx.font = "700 26px 'Inter', sans-serif";
-  ctx.fillText('Términos y condiciones', M, y);
-  y += 38;
+  /* ----- Términos / notas (izquierda) y datos de pago (derecha) ----- */
   let termLines = (q.terms || '').split(/\n+/).map(function(t){ return t.trim(); }).filter(Boolean);
   if(termLines.length === 1){
     const sentences = termLines[0].match(/[^.!?]+[.!?]+|[^.!?]+$/g);
     if(sentences) termLines = sentences.map(function(t){ return t.trim(); }).filter(Boolean);
   }
-  ctx.font = "400 22px 'Inter', sans-serif";
-  termLines.forEach(function(t){
-    const wrapped = wrapLinesCanvas(ctx, t, W-2*M-34, 6);
-    ctx.fillStyle = '#c81e3a';
-    ctx.fillText('•', M+4, y);
-    ctx.fillStyle = '#555';
-    wrapped.forEach(function(ln){
-      ctx.fillText(ln, M+34, y);
-      y += 31;
-    });
-    y += 5;
-  });
+  const noteText = (q.notes || '').trim();
+  const hasLeft = termLines.length > 0 || !!noteText;
 
-  /* ----- Pie de página (anclado al fondo de la hoja carta) ----- */
-  const PAGE_H = Math.round(W * 11 / 8.5);   // proporción exacta de hoja carta (1700 x 2200)
+  const payCells = [
+    ['Banco', biz.bank],
+    ['Titular', biz.holder],
+    ['CLABE', formatClabe(biz.clabe)],
+    ['Cuenta / Tarjeta', biz.account]
+  ].filter(function(c){ return c[1]; });
+  let payShown = false;
+  if(payCells.length){
+    if(type === 'orden_pago') payShown = q.showPayment !== false;
+    else if(isPaidDoc) payShown = (q.showPayment === true) && saldo > 0.005;
+    else payShown = (q.showPayment === true);
+  }
+
+  const twoCol = hasLeft && payShown;
+  const gap = 40;
+  const colW = twoCol ? (W - 2*M - gap) / 2 : (W - 2*M);
+  const top = y + 48;
+  let leftY = top, rightY = top;
+
+  if(hasLeft){
+    ctx.textAlign = 'left';
+    let ly = top + 38;
+    if(termLines.length){
+      ctx.fillStyle = '#0a0a0c';
+      ctx.font = "700 26px 'Inter', sans-serif";
+      ctx.fillText('Términos y condiciones', M, ly);
+      ly += 38;
+      ctx.font = "400 22px 'Inter', sans-serif";
+      termLines.forEach(function(t){
+        const wrapped = wrapLinesCanvas(ctx, t, colW-34, 6);
+        ctx.fillStyle = RED;
+        ctx.fillText('•', M+4, ly);
+        ctx.fillStyle = '#555';
+        wrapped.forEach(function(ln){ ctx.fillText(ln, M+34, ly); ly += 31; });
+        ly += 5;
+      });
+    }
+    if(noteText){
+      ly += 14;
+      ctx.fillStyle = '#0a0a0c';
+      ctx.font = "700 26px 'Inter', sans-serif";
+      ctx.fillText('Notas', M, ly);
+      ly += 36;
+      ctx.font = "400 22px 'Inter', sans-serif";
+      ctx.fillStyle = '#555';
+      wrapLinesCanvas(ctx, noteText, colW, 6).forEach(function(ln){ ctx.fillText(ln, M, ly); ly += 31; });
+    }
+    leftY = ly;
+  }
+
+  if(payShown){
+    const bx = twoCol ? (M + colW + gap) : M;
+    const bw = colW;
+    const cols = twoCol ? 1 : 2;
+    const rows = Math.ceil(payCells.length / cols);
+    const bh = 28 + 42 + rows*76 + 6;
+    ctx.fillStyle = '#f7f5f2';
+    ctx.fillRect(bx, top, bw, bh);
+    ctx.fillStyle = RED;
+    ctx.fillRect(bx, top, 8, bh);
+    ctx.fillStyle = '#0a0a0c';
+    ctx.font = "700 26px 'Inter', sans-serif";
+    ctx.textAlign = 'left';
+    ctx.fillText('Datos de pago', bx+34, top+46);
+    const cellW = (bw - 34) / cols;
+    payCells.forEach(function(c,k){
+      const cx = bx + 34 + (k % cols) * cellW;
+      const cyy = top + 46 + 40 + Math.floor(k/cols) * 76;
+      ctx.fillStyle = '#888';
+      ctx.font = "500 20px 'JetBrains Mono', monospace";
+      ctx.fillText(c[0].toUpperCase(), cx, cyy);
+      ctx.fillStyle = '#0a0a0c';
+      ctx.font = "600 28px 'Inter', sans-serif";
+      ctx.fillText(fitCanvasLine(ctx, c[1], cellW - 40), cx, cyy + 34);
+    });
+    rightY = top + bh;
+  }
+  y = Math.max(leftY, rightY, y);
+
+  /* ----- Pie de página (anclado al fondo de la hoja) ----- */
   const contacts = [];
   if(biz.ig) contacts.push('Instagram ' + bizHandle(biz.ig));
   if(biz.fb) contacts.push('Facebook ' + biz.fb);
@@ -4412,9 +4724,31 @@ async function drawQuoteToCanvas(q){
   });
   if(cl) contactLines.push(cl);
   const footerBlockH = 52 + contactLines.length * 38 + 6;
-  const minFooterTop = y + 40;
+  const sigH = q.showSignature ? 150 : 0;
+  const minFooterTop = y + 40 + sigH;
   const idealFooterTop = PAGE_H - M - footerBlockH;
   const footerTop = Math.max(minFooterTop, idealFooterTop);
+
+  /* Línea de firma */
+  if(q.showSignature){
+    const sigLabels = {
+      cotizacion: 'Acepto esta cotización — nombre y firma',
+      orden_pago: 'Conforme con el pedido — nombre y firma',
+      nota_venta: 'Recibí de conformidad — nombre y firma',
+      recibo: 'Recibió — nombre y firma',
+      custom: 'Conforme — nombre y firma'
+    };
+    const sy = footerTop - 70;
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(M, sy); ctx.lineTo(M+760, sy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W-M-360, sy); ctx.lineTo(W-M, sy); ctx.stroke();
+    ctx.fillStyle = '#777';
+    ctx.font = "400 20px 'Inter', sans-serif";
+    ctx.textAlign = 'left';
+    ctx.fillText(sigLabels[type] || sigLabels.cotizacion, M, sy + 28);
+    ctx.fillText('Fecha', W-M-360, sy + 28);
+  }
 
   ctx.strokeStyle = '#ddd';
   ctx.lineWidth = 1;
@@ -4432,8 +4766,6 @@ async function drawQuoteToCanvas(q){
   });
   ctx.textAlign = 'left';
 
-  /* La hoja siempre mide como mínimo una carta completa (mismas proporciones que el PDF),
-     y solo crece hacia abajo si el contenido no cabe. */
   const finalH = Math.min(Math.max(PAGE_H, footerTop + footerBlockH + M), MAXH);
   const canvas = document.getElementById('cot-canvas');
   canvas.width = W;
@@ -4455,7 +4787,7 @@ function renderSavedQuotesList(){
     const d = new Date(q.dateISO);
     return `<div class="stat" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:12px;flex-wrap:wrap;">
       <div>
-        <div class="label">COT-${String(q.number).padStart(4,'0')} · ${d.toLocaleDateString('es-MX')}</div>
+        <div class="label">${quoteFolio(q)} · ${DOC_TYPES[docTypeOf(q)].label} · ${d.toLocaleDateString('es-MX')}</div>
         <div class="val" style="font-size:15px;">${q.client} — $${q.totalBulk.toFixed(2)}</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -4482,14 +4814,26 @@ function reuseSavedQuote(i){
 
   document.getElementById('cot-client').value = q.client || '';
   document.getElementById('cot-concept').value = q.concept || '';
+  const setV = function(id,v){ const el = document.getElementById(id); if(el && v != null) el.value = v; };
+  setV('cot-doctype', docTypeOf(q));
+  applyDocTypeUI(docTypeOf(q));
+  setV('cot-title-custom', q.titleCustom || '');
+  setV('cot-anticipo', q.anticipoPct != null ? q.anticipoPct : 50);
+  setV('cot-vigencia', q.vigenciaDays != null ? q.vigenciaDays : 15);
+  setV('cot-paynow', q.payNowPct != null ? q.payNowPct : 100);
+  setV('cot-paydays', q.payDays != null ? q.payDays : 3);
+  setV('cot-paymethod', q.payMethod || 'Efectivo');
+  setV('cot-paid', q.paidAmount != null ? q.paidAmount : '');
+  setV('cot-delivery', q.deliveryDate || '');
+  setV('cot-notes', q.notes || '');
+  document.getElementById('cot-show-payment').checked = !!q.showPayment;
+  document.getElementById('cot-show-sign').checked = !!q.showSignature;
   document.getElementById('cot-terms').value = q.terms || '';
-  if(q.anticipoPct != null) document.getElementById('cot-anticipo').value = q.anticipoPct;
-  if(q.vigenciaDays != null) document.getElementById('cot-vigencia').value = q.vigenciaDays;
-  if(q.showPayment != null) document.getElementById('cot-show-payment').checked = !!q.showPayment;
+  cotTermsEdited = true;
   cotItems = q.items.map(it=>({...it}));
   renderCotItems();
 
-  document.getElementById('cot-status').innerHTML = '<span style="color:var(--ok)">Cotización COT-'+String(q.number).padStart(4,'0')+' cargada — ajústala y pulsa "Generar vista previa" para crear una nueva.</span>';
+  document.getElementById('cot-status').innerHTML = '<span style="color:var(--ok)">'+docNounOf(q)+' '+quoteFolio(q)+' cargado — ajústalo (puedes cambiar el título) y pulsa "Generar vista previa" para crear uno nuevo.</span>';
   document.getElementById('panel-cotizacion').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
@@ -4503,13 +4847,16 @@ async function redownloadQuote(i){
   document.getElementById('cot-preview-card').style.display = 'block';
   document.getElementById('cot-confirm-actions').style.display = 'none';
   document.getElementById('cot-download-actions').style.display = 'block';
-  downloadCanvasAsImage(`cotizacion-${String(q.number).padStart(4,'0')}-${q.client.replace(/\s+/g,'_')}.png`);
+  downloadCanvasAsImage(`${quoteFileBase(q)}.png`);
 }
 
 document.getElementById('panel-cotizacion').innerHTML = buildCotizacionPanel();
 renderCotCategorySelect();
 renderCotItems();
 renderSavedQuotesList();
+document.getElementById('cot-terms').addEventListener('input', function(){ cotTermsEdited = true; });
+applyDocTypeUI('cotizacion');
+refreshDefaultTerms();
 
 renderLogoPreview();
 renderCotPhonePreview();
